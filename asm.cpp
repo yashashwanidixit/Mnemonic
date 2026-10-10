@@ -132,6 +132,14 @@ struct AssembledWord
 //HALT - here ldc is target label for line 1 
     int32_t rawOffset;
     //branch offset
+    // Error marker for lines that failed to assemble. When isError is true the
+    // address slot is still reserved (pc advances past it) but the listing prints
+    // errorText instead of a machine word: any 32-bit value, including 0, would
+    // be indistinguishable from a real instruction such as `ldc 0`, so no fake
+    // word is ever emitted. Object-file writers must skip such rows.
+    bool isError = false;
+    std::string errorText;
+    //for unknown mnemonic insconsistency
 };
 
 // Passes identifier
@@ -186,7 +194,7 @@ static bool isValidLabelName(const std::string &name)
 static const InstructionInfo *findInstruction(const std::string &mnemonic)
 {
     // Deliberately exact comparison: mnemonics are case sensitive.
-    for (size_t i = 0; i < INSTRUCTION_TABLE_SIZE; ++i)
+    for (size_t i = 0; i < INSTRUCTION_TABLE_SIZE; i++)
     {
         if (mnemonic == INSTRUCTION_TABLE[i].mnemonic)
         {
@@ -362,6 +370,10 @@ static bool assemblePass(
     for (const ParsedLine &pl : lines)
     {
         int lineNum = pl.lineNumber;
+        // First error on this source line found during the current pass, if any.
+        // Pass 1 reports it to diagnostics; Pass 2 records it here so the listing
+        // can print an ERROR row for the line instead of a misleading zero word.
+        std::string lineError;
 
         // Pass 1: Define labels
         if (pass == Pass::PASS_1)
@@ -378,7 +390,7 @@ static bool assemblePass(
                 else
                 {
                     SymbolEntry entry;
-                    entry.value = static_cast<int32_t>(pc);
+                    entry.value = static_cast<int32_t>(pc);//value is int_32 because every label holds address but SET holds 32 bit constant 
                     entry.definedLine = lineNum;
                     entry.isUsed = false;
                     entry.isSet = false;
@@ -396,11 +408,31 @@ static bool assemblePass(
         const InstructionInfo *inst = findInstruction(pl.mnemonic);
         if (!inst)
         {
+            hasErrors = true;
             if (pass == Pass::PASS_1)
             {
                 diagnostics.push_back({lineNum, false, "unknown mnemonic '" + pl.mnemonic + "'"});
+                // Reserve the address slot so Pass 1 addresses match the Pass 2
+                // listing exactly, even for lines that fail to assemble.
+                pc++;
+                continue;
             }
-            hasErrors = true;
+            // PASS_2: the address slot is reserved (pc advances below) but no
+            // machine word is invented for an unrecognized instruction. The
+            // listing shows the diagnostic text instead (see writeListingFile).
+            AssembledWord aw;
+            aw.address = pc;
+            aw.machineCode = 0; // unused when iserror is true; never written out
+            aw.mnemonic = pl.mnemonic;//is *inst rh
+            aw.operandStr = pl.hasOperand ? pl.operandToken : "";
+            aw.labelsAtAddress = pl.labels;
+            aw.isBranch = false;
+            aw.targetLabel = "";
+            aw.rawOffset = 0;
+            aw.isError = true;
+            aw.errorText = "unknown mnemonic '" + pl.mnemonic + "'";
+            assembledWords.push_back(aw);
+            pc++;
             continue;
         }
 
@@ -414,6 +446,10 @@ static bool assemblePass(
                 {
                     diagnostics.push_back({lineNum, false, "unexpected operand for '" + pl.mnemonic + "'"});
                 }
+                else if (lineError.empty())
+                {
+                    lineError = "unexpected operand for '" + pl.mnemonic + "'";
+                }
                 hasErrors = true;
             }
         }
@@ -424,6 +460,10 @@ static bool assemblePass(
                 if (pass == Pass::PASS_1)
                 {
                     diagnostics.push_back({lineNum, false, "missing operand for '" + pl.mnemonic + "'"});
+                }
+                else if (lineError.empty())
+                {
+                    lineError = "missing operand for '" + pl.mnemonic + "'";
                 }
                 hasErrors = true;
             }
@@ -436,27 +476,46 @@ static bool assemblePass(
             {
                 diagnostics.push_back({lineNum, false, "extra text at end of line: '" + pl.extraText + "'"});
             }
+            else if (lineError.empty())
+            {
+                lineError = "extra text at end of line: '" + pl.extraText + "'";
+            }
             hasErrors = true;
         }
 
-        // Validate operand syntax in Pass 1
-        if (pass == Pass::PASS_1 && pl.hasOperand && inst->opType != OperandType::NONE)
+        // Validate operand syntax: Pass 1 reports the diagnostic, Pass 2 records
+        // the same text so the listing row can mirror it (no duplicate report).
+        if (pl.hasOperand && inst->opType != OperandType::NONE)
         {
             if (isNumericPrefix(pl.operandToken))
             {
                 int64_t dummy = 0;
                 if (!parseNumber(pl.operandToken, dummy))
                 {
-                    diagnostics.push_back({lineNum, false, "invalid number '" + pl.operandToken + "'"});
                     hasErrors = true;
+                    if (pass == Pass::PASS_1)
+                    {
+                        diagnostics.push_back({lineNum, false, "invalid number '" + pl.operandToken + "'"});
+                    }
+                    else if (lineError.empty())
+                    {
+                        lineError = "invalid number '" + pl.operandToken + "'";
+                    }
                 }
             }
             else
             {
                 if (!isValidLabelName(pl.operandToken))
                 {
-                    diagnostics.push_back({lineNum, false, "bogus label name '" + pl.operandToken + "'"});
                     hasErrors = true;
+                    if (pass == Pass::PASS_1)
+                    {
+                        diagnostics.push_back({lineNum, false, "bogus label name '" + pl.operandToken + "'"});
+                    }
+                    else if (lineError.empty())
+                    {
+                        lineError = "bogus label name '" + pl.operandToken + "'";
+                    }
                 }
             }
         }
@@ -523,6 +582,10 @@ static bool assemblePass(
         // ====================================================================
         // Pass 2 Code Generation & Label Resolution
         // ====================================================================
+        // Remember how many diagnostics exist before generating this line: any
+        // Pass-2 diagnostic raised below (no such label, operand out of range)
+        // turns this row into an ERROR marker instead of a fake machine word.
+        size_t diagBefore = diagnostics.size();
         uint32_t word = 0;
         bool isBranch = (inst->opType == OperandType::OFFSET);
         std::string targetLabel;
@@ -630,15 +693,42 @@ static bool assemblePass(
                    (static_cast<uint32_t>(inst->opcode) & OPCODE_MASK);
         }
 
+        // A fresh Pass-2 diagnostic for this line (e.g. no such label, operand
+        // out of range) means the computed word is garbage: keep the address
+        // slot but show the message instead. Parse-time label-name problems
+        // (e.g. a bogus `0def:` prefix) do not mark the row, because the
+        // instruction itself still assembles to a valid word.
+        if (diagnostics.size() > diagBefore && lineError.empty())
+        {
+            lineError = diagnostics[diagBefore].message;
+        }
+
         AssembledWord aw;
         aw.address = pc;
-        aw.machineCode = word;
-        aw.mnemonic = pl.mnemonic;
-        aw.operandStr = pl.operandToken;
-        aw.labelsAtAddress = pl.labels;
-        aw.isBranch = isBranch;
-        aw.targetLabel = targetLabel;
-        aw.rawOffset = rawOffset;
+        if (!lineError.empty())
+        {
+            aw.machineCode = 0; // unused when isError is true; never written out
+            aw.mnemonic = pl.mnemonic;
+            aw.operandStr = pl.hasOperand ? pl.operandToken : "";
+            aw.labelsAtAddress = pl.labels;
+            aw.isBranch = false;
+            aw.targetLabel = "";
+            aw.rawOffset = 0;
+            aw.isError = true;
+            aw.errorText = lineError;
+        }
+        else
+        {
+            aw.machineCode = word;
+            aw.mnemonic = pl.mnemonic;
+            aw.operandStr = pl.operandToken;
+            aw.labelsAtAddress = pl.labels;
+            aw.isBranch = isBranch;
+            aw.targetLabel = targetLabel;
+            aw.rawOffset = rawOffset;
+            aw.isError = false;
+            aw.errorText = "";
+        }
         assembledWords.push_back(aw);
 
         pc++;
@@ -675,6 +765,13 @@ static bool writeObjectFile(const std::string &filename, const std::vector<Assem
 
     for (const AssembledWord &aw : words)
     {
+        // Error-marker rows hold no machine code (their machineCode field is a
+        // dummy zero, which would read back as a real `ldc 0`), so they are
+        // never written to the object file.
+        if (aw.isError)
+        {
+            continue;
+        }
         uint32_t code = aw.machineCode;
         uint8_t bytes[4];
         bytes[0] = static_cast<uint8_t>(code & 0xFF);
@@ -721,6 +818,17 @@ static bool writeListingFile(
         {
             out << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << aw.address
                 << " " << lbl << ":\n";
+        }
+
+        // Failed lines keep their address slot but print the diagnostic instead
+        // of a machine word: any 32-bit value, including 0, would be
+        // indistinguishable from a real instruction such as `ldc 0`.
+        // Format: AAAAAAAA ERROR <message>
+        if (aw.isError)
+        {
+            out << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << aw.address
+                << " ERROR " << aw.errorText << "\n";
+            continue;
         }
 
         // Instruction word line: AAAAAAAA XXXXXXXX mnemonic operand

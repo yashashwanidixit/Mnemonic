@@ -24,7 +24,8 @@ The following features have been fully implemented, rigorously tested, and verif
      `AAAAAAAA XXXXXXXX mnemonic operand`
      with label lines `AAAAAAAA label:` printed before instructions at that address.
      Branch instructions resolve and print target label names when defined, or raw numeric offsets.
-     Verified against test01 expected values in `tests/test01.lst`.
+   - Lines that fail to assemble keep their address slot but print `AAAAAAAA ERROR <message>` instead of a machine word (no fake zero word, which would read as `ldc 0`).
+   - Verified against test01 expected values in `tests/test01.lst`.
 
 4. Instruction table:
    - IMPLEMENTED AND VERIFIED.

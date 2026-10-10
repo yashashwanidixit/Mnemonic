@@ -127,6 +127,7 @@ Listing files format each instruction word as:
 AAAAAAAA XXXXXXXX mnemonic operand
 ```
 Preceded by `AAAAAAAA label:` lines for any labels defined at that address. Branch instructions print the symbolic label name if present at the target address.
+Lines that fail to assemble keep their address slot but print `AAAAAAAA ERROR <message>` instead of a machine word — any 32-bit value (even 0) would be indistinguishable from a real instruction such as `ldc 0`, so no placeholder word is ever emitted.
 
 ---
 
