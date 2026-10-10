@@ -1,0 +1,4 @@
+=== [1] Assembler Execution: ./asm tests/test09.asm ===
+
+=== [2] Emulator Execution: ./emu tests/test09.o  ===
+Error: Division by zero at PC 2

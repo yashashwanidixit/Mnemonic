@@ -1,0 +1,82 @@
+IITPSx Project Implementation Claims
+Name: Yashashwani | ID: 2501AI49
+"I declare this is my own work."
+
+The following features have been fully implemented, rigorously tested, and verified:
+
+1. Two-pass single routine:
+   - IMPLEMENTED AND VERIFIED.
+   - `asm.cpp` uses a single unified function `assemblePass(const std::vector<ParsedLine>& lines, Pass pass, ...)` parameterized by `Pass::PASS_1` and `Pass::PASS_2`.
+   - Pass 1 builds the symbol table, processes SET pseudo-ops, checks lexical/syntax errors, and computes instruction addresses without failing on undefined labels.
+   - Pass 2 resolves label values, performs 24-bit operand range checks, generates 32-bit machine code, records unused label warnings, and detects undefined labels ("no such label").
+
+2. Label errors:
+   - IMPLEMENTED AND VERIFIED.
+   - Detects and reports "bogus label name" for labels not starting with an alphabetic character or containing non-alphanumeric characters (e.g. `0badlabel:`, `_bad:`).
+   - Detects and reports "duplicate label" when the same label name is defined more than once.
+   - Detects and reports "no such label" (undefined label) in Pass 2.
+   - Detects and warns about "unused label" without aborting assembly.
+   - Verified in `tests/test02.asm` and logged in `tests/test02.log`.
+
+3. Memory-dump listing & Advanced listing:
+   - IMPLEMENTED AND VERIFIED.
+   - Listing files (`.lst`) are generated using the preferred advanced format:
+     `AAAAAAAA XXXXXXXX mnemonic operand`
+     with label lines `AAAAAAAA label:` printed before instructions at that address.
+     Branch instructions resolve and print target label names when defined, or raw numeric offsets.
+     Verified against test01 expected values in `tests/test01.lst`.
+
+4. Instruction table:
+   - IMPLEMENTED AND VERIFIED.
+   - Table-driven architecture using a single canonical table `INSTRUCTION_TABLE` containing mnemonic strings, opcodes (0-20, DATA, SET), and operand types (`NONE`, `VALUE`, `OFFSET`, `DATA`, `SET`).
+   - Lookups are case-sensitive, requiring exact matches against `INSTRUCTION_TABLE` (e.g. `ldc`, `HALT`, `data`, `SET`); wrong case such as `halt`, `LDC`, `set`, `DATA` is rejected as "unknown mnemonic" (verified: MiniProject `test1`/`test5`/`test6` `halt` fails on both sample and our assemblers).
+   - No scattered hard-coded instruction logic.
+
+5. Test programs assemble:
+   - IMPLEMENTED AND VERIFIED.
+   - `test01.asm` (specification verification test) assembles cleanly and yields exact matching byte encoding.
+   - `test02.asm` detects all required errors (bogus label name, unknown mnemonic, missing operand, unexpected operand, extra text at end of line, invalid numbers, operand out of range, undefined label, duplicate label) and emits no object file.
+   - `test03.asm` (SET test) assembles cleanly and resolves forward and backward label references.
+   - `test04.asm` (mul and div verification) assembles cleanly.
+   - `test05.asm` (bubble sort) assembles cleanly.
+
+6. Extra tests:
+   - IMPLEMENTED AND VERIFIED.
+   - `test06.asm`: Sum of first 10 natural numbers (computes 55).
+   - `test07.asm`: Polynomial evaluation $P(x) = 3x^2 + 5x + 7$ for $x=4$ (computes 75).
+   - `test08.asm`: Mean of 5 array elements using `div` (computes 35).
+   - `test09.asm`: Division by zero runtime error test (emulator catches and exits with code 1).
+   - `test10.asm`: Factorial of 6 using loop and `mul` (computes 720).
+
+7. SET pseudo-operation:
+   - IMPLEMENTED AND VERIFIED.
+   - `SET` assigns the specified value directly to the label on that line instead of the current PC.
+   - Emits no code and does not advance the address counter.
+   - Forward references (label used before SET definition) and backward references work seamlessly across passes.
+   - Verified in `tests/test03.asm` and `tests/test03.log`.
+
+8. mul and div instructions:
+   - IMPLEMENTED AND VERIFIED in both assembler and emulator.
+   - `mul` opcode 19: `A := B * A`.
+   - `div` opcode 20: `A := B / A` (signed 32-bit integer division).
+   - `INT32_MIN / -1` overflow guard implemented to prevent SIGFPE.
+   - Verified in `tests/test04.asm` leaving `A = 21` (42 / 2).
+
+9. Bubble sort assembles and works:
+   - IMPLEMENTED AND VERIFIED.
+   - `tests/test05.asm` loads array base address with `ldc arr`, computes element pointers using `add`, accesses memory using `ldnl`/`stnl`, and compares adjacent elements using `sub` + `brlz`.
+   - Emulator `-dump` output confirms the array `{45, 12, 89, 34, 23, 7}` is sorted to `{7, 12, 23, 34, 45, 89}`.
+
+10. Emulator loads/dumps/executes/mul-div/div-by-zero/errant-program detection:
+    - IMPLEMENTED AND VERIFIED.
+    - Loads binary files into a 65536-word array starting at address 0.
+    - Implements all instructions matching the IITPSx specification with PC incremented before execution.
+    - `-trace` prints register state (PC, SP, A, B) and decoded instruction each step.
+    - `-dump` prints non-zero memory words formatted in hex.
+    - Detects errant conditions and exits with a nonzero status code:
+      * Division by zero (`tests/test09.asm`)
+      * Instruction limit exceeded (`-max N`) (verified in `tests/test01.asm`)
+      * PC out of range
+      * Unknown opcode
+      * Memory access out of range
+      * Bad file size / file not found

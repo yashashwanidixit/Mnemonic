@@ -1,0 +1,4 @@
+=== [1] Assembler Execution: ./asm tests/test01.asm ===
+
+=== [2] Emulator Execution: ./emu tests/test01.o -max 10 ===
+Error: Instruction limit exceeded (10 instructions executed, probable infinite loop)

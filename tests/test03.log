@@ -1,0 +1,13 @@
+=== [1] Assembler Execution: ./asm tests/test03.asm ===
+
+=== [2] Emulator Execution: ./emu tests/test03.o -trace ===
+PC: 00000000  SP: 0000ffff  A: 00000000  B: 00000000  ldc 75 (0x4b)
+PC: 00000001  SP: 0000ffff  A: 0000004b  B: 00000000  adc 66 (0x42)
+PC: 00000002  SP: 0000ffff  A: 0000008d  B: 00000000  HALT
+HALT executed. Execution finished.
+Instructions executed: 3
+Final register state:
+PC: 0x00000003 (3)
+SP: 0x0000FFFF (65535)
+A:  0x0000008D (141)
+B:  0x00000000 (0)
