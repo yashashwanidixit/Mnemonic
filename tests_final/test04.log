@@ -1,0 +1,15 @@
+=== [1] Assembler Execution: ./asm tests_final/test04.asm ===
+=== [2] Emulator Execution ===
+PC: 00000000  SP: 0000ffff  A: 00000000  B: 00000000  ldc 6 (0x6)
+PC: 00000001  SP: 0000ffff  A: 00000006  B: 00000000  ldc 7 (0x7)
+PC: 00000002  SP: 0000ffff  A: 00000007  B: 00000006  mul
+PC: 00000003  SP: 0000ffff  A: 0000002a  B: 00000006  ldc 2 (0x2)
+PC: 00000004  SP: 0000ffff  A: 00000002  B: 0000002a  div
+PC: 00000005  SP: 0000ffff  A: 00000015  B: 0000002a  HALT
+HALT executed. Execution finished.
+Instructions executed: 6
+Final register state:
+PC: 0x00000006 (6)
+SP: 0x0000FFFF (65535)
+A:  0x00000015 (21)
+B:  0x0000002A (42)

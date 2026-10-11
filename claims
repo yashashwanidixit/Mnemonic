@@ -52,7 +52,7 @@ The following features have been fully implemented, rigorously tested, and verif
 7. SET pseudo-operation:
    - IMPLEMENTED AND VERIFIED.
    - `SET` assigns the specified value directly to the label on that line instead of the current PC.
-   - Emits no code and does not advance the address counter.
+   - Each `SET` line occupies one address: it advances the address counter and emits its value as one 32-bit word.
    - Forward references (label used before SET definition) and backward references work seamlessly across passes.
    - Verified in `tests/test03.asm` and `tests/test03.log`.
 

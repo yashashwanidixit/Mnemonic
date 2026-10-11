@@ -53,7 +53,7 @@ This project provides a complete software stack for the custom **IITPSx** proces
 | `mul` | 19 | - | $A := B \times A$ |
 | `div` | 20 | - | if $A == 0$ runtime error; else $A := B / A$ (signed 32-bit) |
 | `data` | - | value | Reserves one word holding raw 32-bit value |
-| `SET` | - | value | Pseudo-op: sets label to value instead of PC; emits no code |
+| `SET` | - | value | Pseudo-op: sets label to value instead of PC; occupies one address and emits the value as one 32-bit word |
 
 ---
 
@@ -143,7 +143,7 @@ Lines that fail to assemble keep their address slot but print `AAAAAAAA ERROR <m
    - Instruction operands must fit within the signed 24-bit range: $[-8388608, 8388607]$.
    - `data` operands represent raw 32-bit words.
 5. **SET Pseudo-Operation:**
-   Does not generate machine code and does not advance the address counter (`PC`). Labels defined with `SET` can be referenced both before and after the `SET` statement.
+   Labels defined with `SET` are bound to the given value instead of the PC, but each `SET` line still occupies one address: it advances the address counter and emits its value as one 32-bit word. Labels defined with `SET` can be referenced both before and after the `SET` statement.
 6. **Integer Division Overflow Guard:**
    Signed 32-bit division `INT32_MIN / -1` causes a hardware exception on x86 processors. The emulator explicitly guards against this condition and sets `A = INT32_MIN`.
 7. **Empty / Blank / Comment-Only Lines:**

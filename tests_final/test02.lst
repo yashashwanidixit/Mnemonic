@@ -1,0 +1,15 @@
+00000000 00000500 ldc 5
+00000001 ERROR unknown mnemonic 'fakeopcode'
+00000002 ERROR missing operand for 'ldc'
+00000003 ERROR unexpected operand for 'add'
+00000004 00000500 ldc 5
+00000005 ERROR invalid number '08'
+00000006 ERROR invalid number '08ge'
+00000007 ERROR operand out of range (99999999)
+00000008 ERROR no such label 'nonExistentLabel'
+00000009 duplicateName:
+00000009 00000100 ldc 1
+0000000A duplicateName:
+0000000A 00000200 ldc 2
+0000000B neverUsedLabel:
+0000000B 00000012 HALT
