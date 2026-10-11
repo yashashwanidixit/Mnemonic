@@ -1,0 +1,10 @@
+00000000 00000500 ldc 5
+00000001 ERROR missing operand for 'ldc'
+00000002 ERROR unexpected operand for 'add'
+00000003 ERROR unknown mnemonic 'foo'
+00000004 ERROR bogus label name 'missing_label'
+00000005 ERROR unknown mnemonic '//'
+00000006 00000100 ldc 1
+00000007 00000200 ldc 2
+00000008 ERROR no such label 'hello'
+00000009 ERROR unknown mnemonic 'halt'

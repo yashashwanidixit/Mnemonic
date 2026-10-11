@@ -1,0 +1,10 @@
+Warning: Line 3: unused label 'label'
+Error: Line 4: duplicate label 'label'
+Error: Line 5: no such label 'nonesuch'
+Error: Line 6: invalid number '08ge'
+Error: Line 7: missing operand for 'ldc'
+Error: Line 8: unexpected operand for 'add'
+Error: Line 10: bogus label name '0def'
+Error: Line 11: unknown mnemonic 'fibble'
+Error: Line 12: unknown mnemonic '0def'
+Assembly failed with errors. No object file generated.

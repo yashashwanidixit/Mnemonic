@@ -1,0 +1,4 @@
+Program assembled successfully.
+--- labels ---
+val : 75
+val2 : 66

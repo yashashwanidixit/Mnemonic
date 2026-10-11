@@ -1,46 +1,48 @@
 IITPSx Project Implementation Claims
-Name: Yashashwani | ID: 2501AI49
+Name: Yashashwani Dixit| ID: 2501ai49
 "I declare this is my own work."
 
-The following features have been fully implemented, rigorously tested, and verified:
+The following features have been fully implemented,and verified:
 
 1. Two-pass single routine:
-   - IMPLEMENTED AND VERIFIED.
-   - `asm.cpp` uses a single unified function `assemblePass(const std::vector<ParsedLine>& lines, Pass pass, ...)` parameterized by `Pass::PASS_1` and `Pass::PASS_2`.
-   - Pass 1 builds the symbol table, processes SET pseudo-ops, checks lexical/syntax errors, and computes instruction addresses without failing on undefined labels.
-   - Pass 2 resolves label values, performs 24-bit operand range checks, generates 32-bit machine code, records unused label warnings, and detects undefined labels ("no such label").
+   - implemented and verified
+   - 'asm.cpp' uses a single unified function 'assemblePass(const std::vector<ParsedLine>& lines, Pass pass, ...)' parameterized by 'Pass::PASS_1' and 'Pass::PASS_2'.
+   - Pass 1 builds the symbol table,processes SET pseudo-ops, checks lexical/syntax errors, and computes instruction addresses without failing on undefined labels.
+   - Pass 2 resolves label values,performs 24-bit operand range checks,generates 32-bit machine code,records unused label warnings,and detects undefined labels ("no such label").
+   - Number size rule: instruction numbers must fit between -8388608 and 8388607. Pass 2 checks typed numbers, label values, and jump distances; a too-big value gives an `operand out of range` error and stops the object file. `data` is the only exception and keeps the full 32-bit word.
 
 2. Label errors:
-   - IMPLEMENTED AND VERIFIED.
-   - Detects and reports "bogus label name" for labels not starting with an alphabetic character or containing non-alphanumeric characters (e.g. `0badlabel:`, `_bad:`).
-   - Detects and reports "duplicate label" when the same label name is defined more than once.
-   - Detects and reports "no such label" (undefined label) in Pass 2.
+   - implemented and verified
+   -  Detects and reports "bogus label name" for labels not starting with an alphabetic character or containing non-alphanumeric characters (e.g. `0badlabel:`, `_bad:`).
+  -Detects and reports "duplicate label" when the same label name is defined more than once.
+   -Detects and reports "no such label" (undefined label) in Pass 2.
    - Detects and warns about "unused label" without aborting assembly.
-   - Verified in `tests/test02.asm` and logged in `tests/test02.log`.
+        - Verified in `tests/test02.asm` and logged in `tests/test02.log`
+   undefined label - that is not defined , invalid label- labels not starting with alphabetc char or not containa non alphanumeric chars , my code handles both      
 
-3. Memory-dump listing & Advanced listing:
-   - IMPLEMENTED AND VERIFIED.
+3. Memory-dump listing and Advanced listing:
+   implemented and verified
    - Listing files (`.lst`) are generated using the preferred advanced format:
      `AAAAAAAA XXXXXXXX mnemonic operand`
      with label lines `AAAAAAAA label:` printed before instructions at that address.
-     Branch instructions resolve and print target label names when defined, or raw numeric offsets.
+     Branch instructions resolve and print target label names when defined.
    - Lines that fail to assemble keep their address slot but print `AAAAAAAA ERROR <message>` instead of a machine word (no fake zero word, which would read as `ldc 0`).
-   - Verified against test01 expected values in `tests/test01.lst`.
+   - Verified against test01 expected values in `tests/test02.lst`.
 
 4. Instruction table:
-   - IMPLEMENTED AND VERIFIED.
-   - Table-driven architecture using a single canonical table `INSTRUCTION_TABLE` containing mnemonic strings, opcodes (0-20, DATA, SET), and operand types (`NONE`, `VALUE`, `OFFSET`, `DATA`, `SET`).
-   - Lookups are case-sensitive, requiring exact matches against `INSTRUCTION_TABLE` (e.g. `ldc`, `HALT`, `data`, `SET`); wrong case such as `halt`, `LDC`, `set`, `DATA` is rejected as "unknown mnemonic" (verified: MiniProject `test1`/`test5`/`test6` `halt` fails on both sample and our assemblers).
+ 
+   - Table-driven ,using a single  table `INSTRUCTION_TABLE` containing mnemonic strings, opcodes (0-20, DATA, SET), and operand types (`NONE`, `VALUE`, `OFFSET`, `DATA`, `SET`).
+   - Lookups are case-sensitive, requiring exact matches against `INSTRUCTION_TABLE` (e.g. `ldc`, `HALT`, `data`, `SET`); wrong case such as `halt`, `LDC`, `set`, `DATA` is rejected.
+  `test1`/`test5`/`test6` `halt` fails on both sample and our assemblers).
    - No scattered hard-coded instruction logic.
 
-5. Test programs assemble:
-   - IMPLEMENTED AND VERIFIED.
+5. Test programs assemble:==============
+   - implemented and verified 
    - `test01.asm` (specification verification test) assembles cleanly and yields exact matching byte encoding.
-   - `test02.asm` detects all required errors (bogus label name, unknown mnemonic, missing operand, unexpected operand, extra text at end of line, invalid numbers, operand out of range, undefined label, duplicate label) and emits no object file.
+   - `test02.asm` finds every required error (bad label name, unknown instruction, missing operand, extra operand, bad numbers, number too big, unknown label, repeated label) and no object file is made.
    - `test03.asm` (SET test) assembles cleanly and resolves forward and backward label references.
    - `test04.asm` (mul and div verification) assembles cleanly.
    - `test05.asm` (bubble sort) assembles cleanly.
-   - Object files (`.o`) are written only when assembly completes with zero errors, while the listing (`.lst`) is always written. Hence every test except `test02` — the suite's only assembly-failure case — produces a `.o` file. `test01`/`test09` fail later at emulation time (instruction limit / division by zero) after successful assembly, so their object files exist as well.
 
 6. Extra tests:
    - IMPLEMENTED AND VERIFIED.
@@ -50,16 +52,17 @@ The following features have been fully implemented, rigorously tested, and verif
    - `test09.asm`: Division by zero runtime error test (emulator catches and exits with code 1).
    - `test10.asm`: Factorial of 6 using loop and `mul` (computes 720).
 
-7. SET pseudo-operation:
-   - IMPLEMENTED AND VERIFIED.
-   - `SET` assigns the specified value directly to the label on that line instead of the current PC.
+7. SET pseudo-operation:==============
+
+   - 'SET' assigns the specified value directly to the label on that line instead of the current PC.
    - Emits no code and does not advance the address counter.
    - Forward references (label used before SET definition) and backward references work seamlessly across passes.
    - Verified in `tests/test03.asm` and `tests/test03.log`.
+   - Placement rule: the emulator reads memory straight from address 0 and knows nothing of `SET`/`data`, so number lines must sit after `HALT` (numbers at the end). A number in the walking path is read as an order (a `SET 75` word fails as unknown opcode 75). Programmers must write code this way; an earlier try where `SET` took no address was dropped to keep our `test3.o` byte-equal to the sample.
 
 8. mul and div instructions:
    - IMPLEMENTED AND VERIFIED in both assembler and emulator.
-   - `mul` opcode 19: `A := B * A`.
+   - 'mul' opcode 19: `A:=B*A`.
    - `div` opcode 20: `A := B / A` (signed 32-bit integer division).
    - `INT32_MIN / -1` overflow guard implemented to prevent SIGFPE.
    - Verified in `tests/test04.asm` leaving `A = 21` (42 / 2).
@@ -82,3 +85,7 @@ The following features have been fully implemented, rigorously tested, and verif
       * Unknown opcode
       * Memory access out of range
       * Bad file size / file not found
+      * Program exceeding the 65536-word memory capacity (refused at load time, so oversized input can never overflow the simulator's own memory)
+    - Clean initial processor state: `A = B = PC = 0`, `SP = 65535` (top of memory), all 65536 memory words zeroed.
+    - Tolerant source handling: empty, whitespace-only, and `;`-comment-only lines are ignored rather than flagged, and label-only lines (e.g. `loop:`) define the label without emitting code.
+    - Runaway-execution guard is a per-invocation step budget, not loop analysis: `instructionCount` increments once per successfully executed instruction and is checked against the cap before every step (`DEFAULT_MAX_INSTRUCTIONS` = 1000000, overridable per run via `-max N`). The max operations were changed for test1: `tests/test01.asm` executes its three setup loads (addresses 0-2), reaches address 3 where `loop: br loop` jumps back onto itself forever, and `run_tests.sh:75` invokes it as `run_test "test01" "-max 10" 0 1` (emulator failure expected): the `-max` argument is converted with `strtoull` and overwrites `maxIns` (`emu.cpp:401-403`), so 10 replaces 1000000, and the `-trace` log confirms 3 setup steps plus 7 spins before the guard trips with `Instruction limit exceeded (10 instructions executed, probable infinite loop)`, exit code 1 — non-termination proven in milliseconds instead of a million steps.

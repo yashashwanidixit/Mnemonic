@@ -1,0 +1,6 @@
+Warning: Line 1: unused label 'unused1'
+Warning: Line 2: unused label 'unused2'
+Warning: Line 11: unused label 'afterLoop'
+Warning: Line 16: unused label 'neverUsedLabel'
+Error: Line 18: unknown mnemonic 'halt'
+Assembly failed with errors. No object file generated.

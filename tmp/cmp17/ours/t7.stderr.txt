@@ -1,0 +1,15 @@
+Error: Line 1: bogus label name '1badlabel'
+Warning: Line 4: unused label 'start'
+Error: Line 5: missing operand for 'ldc'
+Error: Line 7: unexpected operand for 'add'
+Error: Line 9: unknown mnemonic 'foo'
+Error: Line 11: bogus label name 'missing_label'
+Error: Line 13: unknown mnemonic '//'
+Warning: Line 15: unused label 'dup'
+Error: Line 18: duplicate label 'dup'
+Error: Line 21: no such label 'hello'
+Error: Line 23: SET directive requires a label on the same line
+Error: Line 25: no such label 'abc'
+Warning: Line 25: unused label 'value'
+Error: Line 27: unknown mnemonic 'halt'
+Assembly failed with errors. No object file generated.

@@ -1,0 +1,3 @@
+Warning: Line 2: unused label 'label'
+Error: Line 12: unknown mnemonic 'halt'
+Assembly failed with errors. No object file generated.
