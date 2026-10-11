@@ -1,4 +1,6 @@
 === [1] Assembler Execution: ./asm tests/test04.asm ===
+Program assembled successfully.
+--- labels ---
 
 === [2] Emulator Execution: ./emu tests/test04.o -trace ===
 PC: 00000000  SP: 0000ffff  A: 00000000  B: 00000000  ldc 6 (0x6)

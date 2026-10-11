@@ -40,6 +40,7 @@ The following features have been fully implemented, rigorously tested, and verif
    - `test03.asm` (SET test) assembles cleanly and resolves forward and backward label references.
    - `test04.asm` (mul and div verification) assembles cleanly.
    - `test05.asm` (bubble sort) assembles cleanly.
+   - Object files (`.o`) are written only when assembly completes with zero errors, while the listing (`.lst`) is always written. Hence every test except `test02` — the suite's only assembly-failure case — produces a `.o` file. `test01`/`test09` fail later at emulation time (instruction limit / division by zero) after successful assembly, so their object files exist as well.
 
 6. Extra tests:
    - IMPLEMENTED AND VERIFIED.
@@ -52,7 +53,7 @@ The following features have been fully implemented, rigorously tested, and verif
 7. SET pseudo-operation:
    - IMPLEMENTED AND VERIFIED.
    - `SET` assigns the specified value directly to the label on that line instead of the current PC.
-   - Each `SET` line occupies one address: it advances the address counter and emits its value as one 32-bit word.
+   - Emits no code and does not advance the address counter.
    - Forward references (label used before SET definition) and backward references work seamlessly across passes.
    - Verified in `tests/test03.asm` and `tests/test03.log`.
 

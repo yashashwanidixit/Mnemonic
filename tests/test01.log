@@ -1,4 +1,9 @@
 === [1] Assembler Execution: ./asm tests/test01.asm ===
+Program assembled successfully.
+--- labels ---
+loop : 3
+next : 5
+var1 : 7
 
 === [2] Emulator Execution: ./emu tests/test01.o -max 10 ===
 Error: Instruction limit exceeded (10 instructions executed, probable infinite loop)

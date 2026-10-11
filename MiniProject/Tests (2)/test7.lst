@@ -1,0 +1,10 @@
+0000  00000500  ldc 5  ERR: Line 23: SET must follow a label
+0001  00000000  ldc  ERR: Line 5: missing operand
+0002  00000A06  add 10  ERR: Line 7: unexpected operand
+0003  00000000  foo 5  ERR: Line 9: unknown mnemonic 'foo'
+0004  00000000  ldc missing_label  ERR: Line 11: undefined label 'missing_label'
+0005  00000000  // Wrong Comment format  ERR: Line 13: unknown mnemonic '//'
+0006  00000100  ldc 1  
+0007  00000200  ldc 2  
+0008  00000000  data hello  ERR: Line 21: invalid DATA value
+0009  00000012  halt  

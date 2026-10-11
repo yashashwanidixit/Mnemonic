@@ -1,0 +1,10 @@
+=== Assemble output ===
+--- warnings ---
+WARN: Label 'start' defined but never used
+--- labels ---
+count : 10
+sum : 0
+start : 1
+loop : 5
+done : 15
+Program assembled.

@@ -1,4 +1,0 @@
-=== [1] Assembler Execution: ./asm tests_final/test03.asm ===
-=== [2] Emulator Execution ===
-PC: 00000000  SP: 0000ffff  A: 00000000  B: 00000000  unknown
-Error: Unknown opcode 75 (0x4b) at PC 0

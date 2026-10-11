@@ -1,4 +1,21 @@
 === [1] Assembler Execution: ./asm tests/test05.asm ===
+Program assembled successfully.
+--- labels ---
+arr : 2
+curp : 11
+doSwap : 66
+doneSort : 88
+elem1 : 12
+elem2 : 13
+i : 8
+innerLoop : 36
+j : 9
+lim : 10
+n : 1
+nextI : 82
+noSwap : 76
+outerLoop : 17
+start : 14
 
 === [2] Emulator Execution: ./emu tests/test05.o -dump ===
 HALT executed. Execution finished.

@@ -1,0 +1,20 @@
+=== Assemble output ===
+ERRORS:
+ERR: Line 1: invalid label '1badlabel'
+ERR: Line 18: duplicate label 'dup'
+ERR: Line 23: SET must follow a label
+ERR: Line 25: invalid SET value
+ERR: Line 5: missing operand
+ERR: Line 7: unexpected operand
+ERR: Line 9: unknown mnemonic 'foo'
+ERR: Line 11: undefined label 'missing_label'
+ERR: Line 13: unknown mnemonic '//'
+ERR: Line 21: invalid DATA value
+--- warnings ---
+WARN: Label 'start' defined but never used
+WARN: Label 'dup' defined but never used
+WARN: Label 'value' defined but never used
+--- labels ---
+start : 1
+dup : 6
+value : 10

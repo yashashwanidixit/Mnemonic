@@ -42,7 +42,7 @@ enum class OperandType
     VALUE,  // Instructions requiring a 24-bit value/offset (e.g., ldc, adc, ldl, stl, ldnl, stnl, adj)
     OFFSET, // Branch instructions (call, brz, brlz, br) where label operands become PC-relative offsets
     DATA,   // 'data' directive, stores full 32-bit word
-    SET     // 'SET' pseudo-op, binds label to value and emits the value as one word
+    SET     // 'SET' pseudo-op, assigns value to label without emitting code
 };
 
 // Information structure for each instruction in the table
@@ -496,8 +496,7 @@ bool assemblePass(
             }
         }
 
-        // Handle SET pseudo-operation: binds label(s) to the value AND
-        // occupies one address, emitting the value as a 32-bit word.
+        // Handle SET pseudo-operation
         if (inst->opType == OperandType::SET)
         {
             if (pl.labels.empty())
@@ -508,12 +507,12 @@ bool assemblePass(
                     hasErrors = true;
                 }
             }
-            if (pass == Pass::PASS_1)
+            if (pl.hasOperand)
             {
-                if (pl.hasOperand)
+                int64_t numVal = 0;
+                if (parseNumber(pl.op, numVal))
                 {
-                    int64_t numVal = 0;
-                    if (parseNumber(pl.op, numVal))
+                    if (pass == Pass::PASS_1)
                     {
                         for (const string &lbl : pl.labels)
                         {
@@ -522,92 +521,30 @@ bool assemblePass(
                         }
                     }
                 }
-                // SET advances PC like any other word
-                pc++;
-                continue;
-            }
-            // PASS_2: resolve the value and emit it as one word.
-            size_t diagBefore = diagnostics.size();
-            unsigned setWord = 0;
-            bool setOk = true;
-            if (pl.labels.empty())
-            {
-                if (lineError.empty())
-                    lineError = "SET directive requires a label on the same line";
-                setOk = false;
-            }
-            else if (!pl.hasOperand)
-            {
-                setOk = false; // lineError already holds missing operand
-            }
-            else
-            {
-                int64_t numVal = 0;
-                if (parseNumber(pl.op, numVal))
-                {
-                    setWord = (unsigned)numVal;
-                }
-                else if (isValidLabelName(pl.op))
-                {
-                    auto it = symbolTable.find(pl.op);
-                    if (it == symbolTable.end())
-                    {
-                        diagnostics.push_back({lineNum, false, "no such label '" + pl.op + "'"});
-                        hasErrors = true;
-                        setOk = false;
-                    }
-                    else
-                    {
-                        it->second.isUsed = true;
-                        for (const string &lbl : pl.labels)
-                        {
-                            symbolTable[lbl].value = it->second.value;
-                            symbolTable[lbl].isSet = true;
-                        }
-                        setWord = (unsigned)it->second.value;
-                    }
-                }
                 else
                 {
-                    setOk = false; // lineError already holds invalid number / bogus label
+                    // Operand is a label
+                    if (pass == Pass::PASS_2)
+                    {
+                        auto it = symbolTable.find(pl.op);
+                        if (it == symbolTable.end())
+                        {
+                            diagnostics.push_back({lineNum, false, "no such label '" + pl.op + "'"});
+                            hasErrors = true;
+                        }
+                        else
+                        {
+                            it->second.isUsed = true;
+                            for (const string &lbl : pl.labels)
+                            {
+                                symbolTable[lbl].value = it->second.value;
+                                symbolTable[lbl].isSet = true;
+                            }
+                        }
+                    }
                 }
             }
-            if (diagnostics.size() > diagBefore && lineError.empty())
-            {
-                lineError = diagnostics[diagBefore].message;
-            }
-            AssembledWord aw;
-            aw.address = pc;
-            if (!lineError.empty() || !setOk)
-            {
-                if (lineError.empty() && diagnostics.size() > diagBefore)
-                    lineError = diagnostics[diagBefore].message;
-                if (lineError.empty())
-                    lineError = "invalid SET directive";
-                aw.machineCode = 0; // unused when isError is true; never written out
-                aw.mnemonic = pl.mnem;
-                aw.operandStr = pl.hasOperand ? pl.op : "";
-                aw.labelsAtAddress = pl.labels;
-                aw.isBranch = false;
-                aw.targetLabel = "";
-                aw.rawOffset = 0;
-                aw.isError = true;
-                aw.errorText = lineError;
-            }
-            else
-            {
-                aw.machineCode = static_cast<uint32_t>(setWord);
-                aw.mnemonic = pl.mnem;
-                aw.operandStr = pl.op;
-                aw.labelsAtAddress = pl.labels;
-                aw.isBranch = false;
-                aw.targetLabel = "";
-                aw.rawOffset = 0;
-                aw.isError = false;
-                aw.errorText = "";
-            }
-            words.push_back(aw);
-            pc++;
+            // SET does NOT advance PC
             continue;
         }
 
@@ -993,6 +930,13 @@ int main(int argc, char *argv[])
     if (!writeObjectFile(objFilename, codeWords))
     {
         return 1;
+    }
+
+    cout << "Program assembled successfully.\n";
+    cout << "--- labels ---\n";
+    for (const auto &pair : symbolTable)
+    {
+        cout << pair.first << " : " << pair.second.value << "\n";
     }
 
     return 0;

@@ -1,0 +1,19 @@
+0000  00000000  data 0  WARN: Label 'start' defined but never used
+0001  00000A00  ldc count  
+0002  00000003  stl 0  
+0003  00000000  ldc 0  
+0004  00000103  stl 1  
+0005  00000002  ldl 0  
+0006  0000080F  brz done  
+0007  00000102  ldl 1  
+0008  00000002  ldl 0  
+0009  00000006  add  
+000a  00000103  stl 1  
+000b  00000002  ldl 0  
+000c  FFFFFF01  adc -1  
+000d  00000003  stl 0  
+000e  FFFFF611  br loop  
+000f  00000102  ldl 1  
+0010  00000000  ldc sum  
+0011  00000005  stnl 0  
+0012  00000012  halt  

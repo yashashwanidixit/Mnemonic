@@ -1,0 +1,14 @@
+=== Assemble output ===
+--- warnings ---
+WARN: Line 9: possible infinite loop (backward jump)
+WARN: Label 'unused1' defined but never used
+WARN: Label 'unused2' defined but never used
+WARN: Label 'afterLoop' defined but never used
+WARN: Label 'neverUsedLabel' defined but never used
+--- labels ---
+unused1 : 0
+unused2 : 0
+loop : 3
+afterLoop : 4
+neverUsedLabel : 7
+Program assembled.

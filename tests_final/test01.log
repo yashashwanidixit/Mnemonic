@@ -1,3 +1,0 @@
-=== [1] Assembler Execution: ./asm tests_final/test01.asm ===
-=== [2] Emulator Execution ===
-Error: Instruction limit exceeded (10 instructions executed, probable infinite loop)

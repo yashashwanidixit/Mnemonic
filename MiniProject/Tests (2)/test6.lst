@@ -1,0 +1,9 @@
+0000  00000500  ldc 5  WARN: Label 'unused1' defined but never used
+0001  00000A00  ldc 10  
+0002  00000006  add  
+0003  FFFFFF11  br loop  WARN: Line 9: possible infinite loop (backward jump)
+0004  00000100  ldc 1  
+0005  00000200  ldc 2  
+0006  00000007  sub  
+0007  00000300  ldc 3  
+0008  00000012  halt  

@@ -1,4 +1,14 @@
 === [1] Assembler Execution: ./asm tests/test08.asm ===
+Program assembled successfully.
+--- labels ---
+arr : 2
+calcMean : 39
+idx : 8
+loop : 16
+mean : 9
+n : 1
+start : 10
+sum : 7
 
 === [2] Emulator Execution: ./emu tests/test08.o -trace ===
 PC: 00000000  SP: 0000ffff  A: 00000000  B: 00000000  br 9 (0x9)

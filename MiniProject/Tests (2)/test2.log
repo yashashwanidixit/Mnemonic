@@ -1,0 +1,15 @@
+=== Assemble output ===
+ERRORS:
+ERR: Line 4: duplicate label 'label'
+ERR: Line 10: invalid label '0def'
+ERR: Line 5: undefined label 'nonesuch'
+ERR: Line 6: undefined label '08ge'
+ERR: Line 7: missing operand
+ERR: Line 8: unexpected operand
+ERR: Line 9: undefined label '5, 6'
+ERR: Line 11: unknown mnemonic 'fibble'
+ERR: Line 12: unknown mnemonic '0def'
+--- warnings ---
+WARN: Label 'label' defined but never used
+--- labels ---
+label : 0
