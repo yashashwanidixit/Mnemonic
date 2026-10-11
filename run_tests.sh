@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run_tests.sh - Automated test runner for IITPSx Assembler and Emulator
+# run_tests.sh - test runner for IITPSx Assembler and Emulator
 # Name: Yashashwani | ID: 2501AI49
 # "I declare this is my own work."
 
@@ -13,33 +13,33 @@ PASSED=0
 TOTAL=0
 
 run_test() {
-    local test_name="$1"
-    local asm_file="tests/${test_name}.asm"
-    local obj_file="tests/${test_name}.o"
-    local lst_file="tests/${test_name}.lst"
-    local log_file="tests/${test_name}.log"
+    local tn="$1"
+    local asm_file="tests/${tn}.asm"
+    local obj_file="tests/${tn}.o"
+    local lst_file="tests/${tn}.lst"
+    local lg="tests/${tn}.log"
     local emu_args="${2:-}"
     local expect_asm_fail="${3:-0}"
     local expect_emu_fail="${4:-0}"
 
     TOTAL=$((TOTAL + 1))
-    echo -n "Test ${test_name}... "
-    rm -f "${log_file}"
+    printf "Test %s... " "${tn}"
+    rm -f "${lg}"
 
-    echo "=== [1] Assembler Execution: ./asm ${asm_file} ===" > "${log_file}"
-    ./asm "${asm_file}" >> "${log_file}" 2>&1
-    local asm_status=$?
+    echo "=== [1] Assembler Execution: ./asm ${asm_file} ===" > "${lg}"
+    ./asm "${asm_file}" >> "${lg}" 2>&1
+    local ast=$?
 
     if [ ${expect_asm_fail} -eq 1 ]; then
-        if [ ${asm_status} -ne 0 ]; then
-            echo "PASS (Expected assembly error detected)"
+        if [ ${ast} -ne 0 ]; then
+            printf "%s\n" "PASS (Expected assembly error detected)"
             PASSED=$((PASSED + 1))
         else
             echo "FAIL (Expected assembly error, but succeeded)"
         fi
         return
     else
-        if [ ${asm_status} -ne 0 ]; then
+        if [ ${ast} -ne 0 ]; then
             echo "FAIL (Assembly failed unexpectedly)"
             return
         fi
@@ -47,23 +47,23 @@ run_test() {
 
     # Run emulator if object file was produced
     if [ -f "${obj_file}" ]; then
-        echo -e "\n=== [2] Emulator Execution: ./emu ${obj_file} ${emu_args} ===" >> "${log_file}"
-        ./emu "${obj_file}" ${emu_args} >> "${log_file}" 2>&1
-        local emu_status=$?
+        echo -e "\n=== [2] Emulator Execution: ./emu ${obj_file} ${emu_args} ===" >> "${lg}"
+        ./emu "${obj_file}" ${emu_args} >> "${lg}" 2>&1
+        local est=$?
 
         if [ ${expect_emu_fail} -eq 1 ]; then
-            if [ ${emu_status} -ne 0 ]; then
+            if [ ${est} -ne 0 ]; then
                 echo "PASS (Expected emulator runtime error detected)"
                 PASSED=$((PASSED + 1))
             else
                 echo "FAIL (Expected runtime error, but emulator exited 0)"
             fi
         else
-            if [ ${emu_status} -eq 0 ]; then
+            if [ ${est} -eq 0 ]; then
                 echo "PASS (Clean assembly and successful execution)"
                 PASSED=$((PASSED + 1))
             else
-                echo "FAIL (Emulator exited with error: ${emu_status})"
+                echo "FAIL (Emulator exited with error: ${est})"
             fi
         fi
     else

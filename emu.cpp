@@ -2,13 +2,16 @@
 // "I declare this is my own work."
 
 #include <iostream>
+#include <cstdlib>
+#include <string>
 #include <fstream>
 #include <vector>
-#include <string>
 #include <cstdint>
-#include <cstdlib>
 #include <climits>
 #include <iomanip>
+#include <cstdio>
+
+using namespace std;
 
 // ============================================================================
 // Constants and Configuration
@@ -21,38 +24,38 @@ constexpr size_t MEMORY_CAPACITY = 65536;
 constexpr uint64_t DEFAULT_MAX_INSTRUCTIONS = 1000000ULL;
 
 // Opcode definitions matching IITPSx specification
-constexpr uint32_t OP_LDC    = 0;
-constexpr uint32_t OP_ADC    = 1;
-constexpr uint32_t OP_LDL    = 2;
-constexpr uint32_t OP_STL    = 3;
-constexpr uint32_t OP_LDNL   = 4;
-constexpr uint32_t OP_STNL   = 5;
-constexpr uint32_t OP_ADD    = 6;
-constexpr uint32_t OP_SUB    = 7;
-constexpr uint32_t OP_SHL    = 8;
-constexpr uint32_t OP_SHR    = 9;
-constexpr uint32_t OP_ADJ    = 10;
-constexpr uint32_t OP_A2SP   = 11;
-constexpr uint32_t OP_SP2A   = 12;
-constexpr uint32_t OP_CALL   = 13;
-constexpr uint32_t OP_RETURN = 14;
-constexpr uint32_t OP_BRZ    = 15;
-constexpr uint32_t OP_BRLZ   = 16;
-constexpr uint32_t OP_BR     = 17;
-constexpr uint32_t OP_HALT   = 18;
-constexpr uint32_t OP_MUL    = 19;
-constexpr uint32_t OP_DIV    = 20;
+constexpr unsigned OP_LDC    = 0;
+constexpr unsigned OP_ADC    = 1;
+constexpr unsigned OP_LDL    = 2;
+constexpr unsigned OP_STL    = 3;
+constexpr unsigned OP_LDNL   = 4;
+constexpr unsigned OP_STNL   = 5;
+constexpr unsigned OP_ADD    = 6;
+constexpr unsigned OP_SUB    = 7;
+constexpr unsigned OP_SHL    = 8;
+constexpr unsigned OP_SHR    = 9;
+constexpr unsigned OP_ADJ    = 10;
+constexpr unsigned OP_A2SP   = 11;
+constexpr unsigned OP_SP2A   = 12;
+constexpr unsigned OP_CALL   = 13;
+constexpr unsigned OP_RETURN = 14;
+constexpr unsigned OP_BRZ    = 15;
+constexpr unsigned OP_BRLZ   = 16;
+constexpr unsigned OP_BR     = 17;
+constexpr unsigned OP_HALT   = 18;
+constexpr unsigned OP_MUL    = 19;
+constexpr unsigned OP_DIV    = 20;
 
 // ============================================================================
 // Processor State Structure
 // ============================================================================
 
 struct ProcessorState {
-    int32_t regA = 0;
-    int32_t regB = 0;
-    uint32_t regPC = 0;
-    uint32_t regSP = static_cast<uint32_t>(MEMORY_CAPACITY - 1); // Top of memory
-    std::vector<int32_t> memory;
+    int regA = 0;
+    int regB = 0;
+    unsigned regPC = 0;
+    unsigned regSP = (unsigned)(MEMORY_CAPACITY - 1); // Top of memory
+    vector<int> memory;
     uint64_t instructionCount = 0;
     bool halted = false;
 
@@ -60,8 +63,8 @@ struct ProcessorState {
 };
 
 // Returns mnemonic string for a given opcode
-static const char* getOpcodeName(uint32_t opcode) {
-    switch (opcode) {
+const char* getOpcodeName(unsigned op) {
+    switch (op) {
         case OP_LDC:    return "ldc";
         case OP_ADC:    return "adc";
         case OP_LDL:    return "ldl";
@@ -88,8 +91,8 @@ static const char* getOpcodeName(uint32_t opcode) {
 }
 
 // Checks if opcode takes an operand
-static bool opcodeHasOperand(uint32_t opcode) {
-    switch (opcode) {
+bool opcodeHasOperand(unsigned op) {
+    switch (op) {
         case OP_LDC:
         case OP_ADC:
         case OP_LDL:
@@ -112,49 +115,49 @@ static bool opcodeHasOperand(uint32_t opcode) {
 // ============================================================================
 
 // Loads binary object file into processor memory starting at address 0
-static bool loadBinary(const std::string& filename, ProcessorState& state, size_t& loadedWords) {
-    std::ifstream file(filename, std::ios::binary | std::ios::ate);
+bool loadBinary(const string& fname, ProcessorState& st, size_t& nWords) {
+    ifstream file(fname, ios::binary | ios::ate);
     if (!file.is_open()) {
-        std::cerr << "Error: File not found: " << filename << std::endl;
+        fprintf(stderr, "Error: File not found: %s\n", fname.c_str());
         return false;
     }
 
-    std::streamsize fileSize = file.tellg();
+    streamsize fileSize = file.tellg();
     if (fileSize < 0) {
-        std::cerr << "Error: Could not read file size: " << filename << std::endl;
+        cerr << "Error: Could not read file size: " << fname << endl;
         return false;
     }
 
     if (fileSize % 4 != 0) {
-        std::cerr << "Error: Bad file size (not a multiple of 4 bytes): " << filename
-                  << " (" << fileSize << " bytes)" << std::endl;
+        cerr << "Error: Bad file size (not a multiple of 4 bytes): " << fname
+                  << " (" << fileSize << " bytes)" << endl;
         return false;
     }
 
-    size_t words = static_cast<size_t>(fileSize / 4);
+    size_t words = (size_t)(fileSize / 4);
     if (words > MEMORY_CAPACITY) {
-        std::cerr << "Error: Program exceeds memory capacity: " << words
-                  << " words > " << MEMORY_CAPACITY << " words" << std::endl;
+        cerr << "Error: Program exceeds memory capacity: " << words
+                  << " words > " << MEMORY_CAPACITY << " words" << endl;
         return false;
     }
 
-    file.seekg(0, std::ios::beg);
-    std::vector<uint8_t> buffer(static_cast<size_t>(fileSize));
+    file.seekg(0, ios::beg);
+    vector<uint8_t> buffer((size_t)fileSize);
     if (!file.read(reinterpret_cast<char*>(buffer.data()), fileSize)) {
-        std::cerr << "Error: Failed to read object file: " << filename << std::endl;
+        cerr << "Error: Failed to read object file: " << fname << endl;
         return false;
     }
 
     for (size_t i = 0; i < words; ++i) {
-        uint32_t b0 = buffer[i * 4 + 0];
-        uint32_t b1 = buffer[i * 4 + 1];
-        uint32_t b2 = buffer[i * 4 + 2];
-        uint32_t b3 = buffer[i * 4 + 3];
+        unsigned b0 = buffer[i * 4 + 0];
+        unsigned b1 = buffer[i * 4 + 1];
+        unsigned b2 = buffer[i * 4 + 2];
+        unsigned b3 = buffer[i * 4 + 3];
         uint32_t word = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
-        state.memory[i] = static_cast<int32_t>(word);
+        st.memory[i] = (int)word;
     }
 
-    loadedWords = words;
+    nWords = words;
     return true;
 }
 
@@ -163,179 +166,178 @@ static bool loadBinary(const std::string& filename, ProcessorState& state, size_
 // ============================================================================
 
 // Executes a single instruction cycle
-static bool executeStep(ProcessorState& state, bool trace) {
-    if (state.regPC >= MEMORY_CAPACITY) {
-        std::cerr << "Error: PC out of range (PC = " << state.regPC << ")" << std::endl;
+bool executeStep(ProcessorState& st, bool trace) {
+    if (st.regPC >= MEMORY_CAPACITY) {
+        cerr << "Error: PC out of range (PC = " << st.regPC << ")" << endl;
         return false;
     }
 
-    uint32_t instructionPC = state.regPC;
-    int32_t word = state.memory[instructionPC];
+    unsigned pc = st.regPC;
+    int word = st.memory[pc];
 
     // Decode opcode (bottom 8 bits) and operand (upper 24 bits sign-extended)
-    uint32_t opcode = static_cast<uint32_t>(word) & 0xFFu;
-    int32_t operand = word >> 8; // Arithmetic right shift performs 2's complement sign extension
+    unsigned opcode = (unsigned)word & 0xFFu;
+    int operand = word >> 8; // Arithmetic right shift performs 2's complement sign extension
 
     // PC is incremented BEFORE the instruction's action executes
-    state.regPC++;
+    st.regPC++;
 
     if (trace) {
-        std::cout << "PC: " << std::hex << std::setfill('0') << std::setw(8) << instructionPC
-                  << "  SP: " << std::setw(8) << state.regSP
-                  << "  A: " << std::setw(8) << static_cast<uint32_t>(state.regA)
-                  << "  B: " << std::setw(8) << static_cast<uint32_t>(state.regB)
+        cout << "PC: " << hex << setfill('0') << setw(8) << pc
+                  << "  SP: " << setw(8) << st.regSP
+                  << "  A: " << setw(8) << (unsigned)st.regA
+                  << "  B: " << setw(8) << static_cast<unsigned>(st.regB)
                   << "  " << getOpcodeName(opcode);
         if (opcodeHasOperand(opcode)) {
-            std::cout << " " << std::dec << operand << " (0x" << std::hex << (operand & 0xFFFFFF) << ")";
+            cout << " " << dec << operand << " (0x" << hex << (operand & 0xFFFFFF) << ")";
         }
-        std::cout << std::dec << "\n";
+        cout << dec << "\n";
     }
 
     switch (opcode) {
         case OP_LDC:
-            state.regB = state.regA;
-            state.regA = operand;
+            st.regB = st.regA;
+            st.regA = operand;
             break;
 
         case OP_ADC:
-            state.regA = state.regA + operand;
+            st.regA = st.regA + operand;
             break;
 
         case OP_LDL: {
-            int64_t targetAddr = static_cast<int64_t>(state.regSP) + operand;
-            if (targetAddr < 0 || targetAddr >= static_cast<int64_t>(MEMORY_CAPACITY)) {
-                std::cerr << "Error: Memory access out of range (address " << targetAddr
-                          << " at PC " << instructionPC << ")" << std::endl;
+            int64_t addr = (int64_t)st.regSP + operand;
+            if (addr < 0 || addr >= (int64_t)MEMORY_CAPACITY) {
+                cerr << "Error: Memory access out of range (address " << addr
+                          << " at PC " << pc << ")" << endl;
                 return false;
             }
-            state.regB = state.regA;
-            state.regA = state.memory[static_cast<size_t>(targetAddr)];
+            st.regB = st.regA;
+            st.regA = st.memory[(size_t)addr];
             break;
         }
 
         case OP_STL: {
-            int64_t targetAddr = static_cast<int64_t>(state.regSP) + operand;
-            if (targetAddr < 0 || targetAddr >= static_cast<int64_t>(MEMORY_CAPACITY)) {
-                std::cerr << "Error: Memory access out of range (address " << targetAddr
-                          << " at PC " << instructionPC << ")" << std::endl;
+            int64_t addr = static_cast<int64_t>(st.regSP) + operand;
+            if (addr < 0 || addr >= static_cast<int64_t>(MEMORY_CAPACITY)) {
+                cerr << "Error: Memory access out of range (address " << addr
+                          << " at PC " << pc << ")" << endl;
                 return false;
             }
-            state.memory[static_cast<size_t>(targetAddr)] = state.regA;
-            state.regA = state.regB;
+            st.memory[static_cast<size_t>(addr)] = st.regA;
+            st.regA = st.regB;
             break;
         }
 
         case OP_LDNL: {
-            int64_t targetAddr = static_cast<int64_t>(state.regA) + operand;
-            if (targetAddr < 0 || targetAddr >= static_cast<int64_t>(MEMORY_CAPACITY)) {
-                std::cerr << "Error: Memory access out of range (address " << targetAddr
-                          << " at PC " << instructionPC << ")" << std::endl;
+            int64_t addr = (int64_t)st.regA + operand;
+            if (addr < 0 || addr >= (int64_t)MEMORY_CAPACITY) {
+                cerr << "Error: Memory access out of range (address " << addr
+                          << " at PC " << pc << ")" << endl;
                 return false;
             }
-            state.regA = state.memory[static_cast<size_t>(targetAddr)];
+            st.regA = st.memory[(size_t)addr];
             break;
         }
 
         case OP_STNL: {
-            int64_t targetAddr = static_cast<int64_t>(state.regA) + operand;
-            if (targetAddr < 0 || targetAddr >= static_cast<int64_t>(MEMORY_CAPACITY)) {
-                std::cerr << "Error: Memory access out of range (address " << targetAddr
-                          << " at PC " << instructionPC << ")" << std::endl;
+            int64_t addr = static_cast<int64_t>(st.regA) + operand;
+            if (addr < 0 || addr >= static_cast<int64_t>(MEMORY_CAPACITY)) {
+                cerr << "Error: Memory access out of range (address " << addr
+                          << " at PC " << pc << ")" << endl;
                 return false;
             }
-            state.memory[static_cast<size_t>(targetAddr)] = state.regB;
+            st.memory[static_cast<size_t>(addr)] = st.regB;
             break;
         }
 
         case OP_ADD:
-            state.regA = state.regB + state.regA;
+            st.regA = st.regB + st.regA;
             break;
 
         case OP_SUB:
-            state.regA = state.regB - state.regA;
+            st.regA = st.regB - st.regA;
             break;
 
         case OP_SHL: {
-            uint32_t shiftAmount = static_cast<uint32_t>(state.regA) & 31u;
-            state.regA = static_cast<int32_t>(static_cast<uint32_t>(state.regB) << shiftAmount);
+            unsigned sh = (unsigned)st.regA & 31u;
+            st.regA = (int)((unsigned)st.regB << sh);
             break;
         }
 
         case OP_SHR: {
-            uint32_t shiftAmount = static_cast<uint32_t>(state.regA) & 31u;
-            state.regA = state.regB >> shiftAmount; // Arithmetic shift in C++ for signed type
+            unsigned shiftAmount = static_cast<unsigned>(st.regA) & 31u;
+            st.regA = st.regB >> shiftAmount; // Arithmetic shift in C++ for signed type
             break;
         }
 
         case OP_ADJ:
-            state.regSP = static_cast<uint32_t>(static_cast<int64_t>(state.regSP) + operand);
+            st.regSP = (unsigned)((int64_t)st.regSP + operand);
             break;
 
         case OP_A2SP:
-            state.regSP = static_cast<uint32_t>(state.regA);
-            state.regA = state.regB;
+            st.regSP = (unsigned)st.regA;
+            st.regA = st.regB;
             break;
 
         case OP_SP2A:
-            state.regB = state.regA;
-            state.regA = static_cast<int32_t>(state.regSP);
+            st.regB = st.regA;
+            st.regA = (int)st.regSP;
             break;
 
         case OP_CALL:
-            state.regB = state.regA;
-            state.regA = static_cast<int32_t>(state.regPC);
-            state.regPC = static_cast<uint32_t>(static_cast<int64_t>(state.regPC) + operand);
+            st.regB = st.regA;
+            st.regA = (int)st.regPC;
+            st.regPC = (unsigned)((int64_t)st.regPC + operand);
             break;
 
         case OP_RETURN:
-            state.regPC = static_cast<uint32_t>(state.regA);
-            state.regA = state.regB;
+            st.regPC = static_cast<unsigned>(st.regA);
+            st.regA = st.regB;
             break;
 
         case OP_BRZ:
-            if (state.regA == 0) {
-                state.regPC = static_cast<uint32_t>(static_cast<int64_t>(state.regPC) + operand);
-            }
+            if (st.regA == 0)
+                st.regPC = (unsigned)((int64_t)st.regPC + operand);
             break;
 
         case OP_BRLZ:
-            if (state.regA < 0) {
-                state.regPC = static_cast<uint32_t>(static_cast<int64_t>(state.regPC) + operand);
+            if (st.regA < 0) {
+                st.regPC = static_cast<unsigned>(static_cast<int64_t>(st.regPC) + operand);
             }
             break;
 
         case OP_BR:
-            state.regPC = static_cast<uint32_t>(static_cast<int64_t>(state.regPC) + operand);
+            st.regPC = static_cast<unsigned>(static_cast<int64_t>(st.regPC) + operand);
             break;
 
         case OP_HALT:
-            state.halted = true;
+            st.halted = true;
             break;
 
         case OP_MUL:
-            state.regA = state.regB * state.regA;
+            st.regA = st.regB * st.regA;
             break;
 
         case OP_DIV:
-            if (state.regA == 0) {
-                std::cerr << "Error: Division by zero at PC " << instructionPC << std::endl;
+            if (st.regA == 0) {
+                fprintf(stderr, "Error: Division by zero at PC %u\n", pc);
                 return false;
             }
-            if (state.regB == INT32_MIN && state.regA == -1) {
+            if (st.regB == INT32_MIN && st.regA == -1) {
                 // Guard against 32-bit signed division overflow
-                state.regA = INT32_MIN;
+                st.regA = INT32_MIN;
             } else {
-                state.regA = state.regB / state.regA;
+                st.regA = st.regB / st.regA;
             }
             break;
 
         default:
-            std::cerr << "Error: Unknown opcode " << opcode << " (0x" << std::hex << opcode
-                      << std::dec << ") at PC " << instructionPC << std::endl;
+            cerr << "Error: Unknown opcode " << opcode << " (0x" << hex << opcode
+                      << dec << ") at PC " << pc << endl;
             return false;
     }
 
-    state.instructionCount++;
+    st.instructionCount++;
     return true;
 }
 
@@ -344,15 +346,15 @@ static bool executeStep(ProcessorState& state, bool trace) {
 // ============================================================================
 
 // Dumps memory contents in hex format (4 words per line) up to highest modified/loaded address
-static void dumpMemory(const ProcessorState& state, size_t maxDumpWords) {
-    std::cout << "\n========== Memory Dump ==========\n";
+void dumpMemory(const ProcessorState& st, size_t maxDumpWords) {
+    cout << "\n========== Memory Dump ==========" << endl;
     size_t endWord = maxDumpWords;
     if (endWord > MEMORY_CAPACITY) endWord = MEMORY_CAPACITY;
 
     // Find highest non-zero address to avoid printing 64k lines of zeros
     size_t lastNonZero = 0;
     for (size_t i = 0; i < MEMORY_CAPACITY; ++i) {
-        if (state.memory[i] != 0) {
+        if (st.memory[i] != 0) {
             lastNonZero = i;
         }
     }
@@ -364,15 +366,15 @@ static void dumpMemory(const ProcessorState& state, size_t maxDumpWords) {
     if (endWord > MEMORY_CAPACITY) endWord = MEMORY_CAPACITY;
 
     for (size_t i = 0; i < endWord; i += 4) {
-        std::cout << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << i << ": ";
+        cout << uppercase << hex << setfill('0') << setw(8) << i << ": ";
         for (size_t j = 0; j < 4; ++j) {
             if (i + j < MEMORY_CAPACITY) {
-                std::cout << std::setw(8) << static_cast<uint32_t>(state.memory[i + j]) << " ";
+                cout << setw(8) << (unsigned)st.memory[i + j] << " ";
             }
         }
-        std::cout << "\n";
+        cout << "\n";
     }
-    std::cout << std::dec;
+    cout << dec;
 }
 
 // ============================================================================
@@ -381,63 +383,63 @@ static void dumpMemory(const ProcessorState& state, size_t maxDumpWords) {
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <prog.o> [-trace] [-dump] [-max N]" << std::endl;
+        cerr << "Usage: " << argv[0] << " <prog.o> [-trace] [-dump] [-max N]" << endl;
         return 1;
     }
 
-    std::string filename = argv[1];
+    string fname = argv[1];
     bool trace = false;
     bool dump = false;
-    uint64_t maxInstructions = DEFAULT_MAX_INSTRUCTIONS;
+    uint64_t maxIns = DEFAULT_MAX_INSTRUCTIONS;
 
     for (int i = 2; i < argc; ++i) {
-        std::string arg = argv[i];
+        string arg = argv[i];
         if (arg == "-trace") {
             trace = true;
         } else if (arg == "-dump") {
             dump = true;
         } else if (arg == "-max" && i + 1 < argc) {
             char* endPtr = nullptr;
-            maxInstructions = std::strtoull(argv[++i], &endPtr, 0);
+            maxIns = strtoull(argv[++i], &endPtr, 0);
         } else {
-            std::cerr << "Error: Unknown argument " << arg << std::endl;
+            cerr << "Error: Unknown argument " << arg << endl;
             return 1;
         }
     }
 
-    ProcessorState state;
-    size_t loadedWords = 0;
-    if (!loadBinary(filename, state, loadedWords)) {
+    ProcessorState st;
+    size_t nWords = 0;
+    if (!loadBinary(fname, st, nWords)) {
         return 1;
     }
 
-    while (!state.halted) {
-        if (state.instructionCount >= maxInstructions) {
-            std::cerr << "Error: Instruction limit exceeded (" << maxInstructions
-                      << " instructions executed, probable infinite loop)" << std::endl;
+    while (!st.halted) {
+        if (st.instructionCount >= maxIns) {
+            cerr << "Error: Instruction limit exceeded (" << maxIns
+                      << " instructions executed, probable infinite loop)" << endl;
             return 1;
         }
 
-        if (!executeStep(state, trace)) {
+        if (!executeStep(st, trace)) {
             return 1;
         }
     }
 
     // Stop cleanly on HALT, then print final registers and instruction count
-    std::cout << "HALT executed. Execution finished.\n"
-              << "Instructions executed: " << state.instructionCount << "\n"
+    cout << "HALT executed. Execution finished.\n"
+              << "Instructions executed: " << st.instructionCount << "\n"
               << "Final register state:\n"
-              << "PC: 0x" << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << state.regPC
-              << " (" << std::dec << state.regPC << ")\n"
-              << "SP: 0x" << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << state.regSP
-              << " (" << std::dec << state.regSP << ")\n"
-              << "A:  0x" << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << static_cast<uint32_t>(state.regA)
-              << " (" << std::dec << state.regA << ")\n"
-              << "B:  0x" << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << static_cast<uint32_t>(state.regB)
-              << " (" << std::dec << state.regB << ")\n";
+              << "PC: 0x" << uppercase << hex << setfill('0') << setw(8) << st.regPC
+              << " (" << dec << st.regPC << ")\n"
+              << "SP: 0x" << uppercase << hex << setfill('0') << setw(8) << st.regSP
+              << " (" << dec << st.regSP << ")\n"
+              << "A:  0x" << uppercase << hex << setfill('0') << setw(8) << (unsigned)st.regA
+              << " (" << dec << st.regA << ")\n"
+              << "B:  0x" << uppercase << hex << setfill('0') << setw(8) << static_cast<unsigned>(st.regB)
+              << " (" << dec << st.regB << ")\n";
 
     if (dump) {
-        dumpMemory(state, loadedWords);
+        dumpMemory(st, nWords);
     }
 
     return 0;

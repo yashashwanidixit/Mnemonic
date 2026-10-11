@@ -2,17 +2,19 @@
 // "I declare this is my own work."
 
 #include <iostream>
-#include <fstream>
-
+#include <cstdlib>
 #include <string>
+#include <fstream>
 #include <vector>
 #include <map>
-#include <cstdint>
-#include <cstdlib>
 #include <cctype>
+#include <cstdint>
 #include <cerrno>
 #include <algorithm>
 #include <iomanip>
+#include <cstdio>
+
+using namespace std;
 
 // ============================================================================
 // Constants and Definitions
@@ -24,9 +26,9 @@ constexpr int64_t INT24_MAX_VAL = 8388607L;  //  2^23 - 1
 // constespr is used when we want the constant to get assigned at compile time
 // instead of runtime itself
 //  Bit manipulation masks
-constexpr uint32_t OPCODE_MASK = 0x000000FFu;
-constexpr uint32_t OPERAND24_MASK = 0x00FFFFFFu;
-constexpr unsigned int OPERAND_SHIFT = 8u;
+constexpr unsigned OPCODE_MASK = 0x000000FFu;
+constexpr unsigned OPERAND24_MASK = 0x00FFFFFFu;
+constexpr unsigned OPERAND_SHIFT = 8u;
 
 // Special pseudo opcodes
 // separately so that they dont clash with the actual opcode instructionsw
@@ -87,7 +89,7 @@ constexpr size_t INSTRUCTION_TABLE_SIZE = sizeof(INSTRUCTION_TABLE) / sizeof(INS
 // Symbol table entry holding label properties
 struct SymbolEntry
 {
-    int32_t value = 0;   // Address or SET value
+    int value = 0;   // Address or SET value
     int definedLine = 0; // 1-based source line where defined
     bool isUsed = false; // Track if referenced by any instruction
     bool isSet = false;  // True if defined via SET pseudo-op
@@ -98,39 +100,37 @@ struct Diagnostic
 {
     int line;
     bool isWarning;
-    std::string message;
+    string message;
 };
 
 // Representation of a tokenized line of source assembly
 struct ParsedLine
 {
     int lineNumber = 0;
-    std::string rawLine;
-    std::vector<std::string> labels;
+    string rawLine;
+    vector<string> labels;
     bool hasStatement = false;
-    std::string mnemonic;
+    string mnem;
     bool hasOperand = false;
-    std::string operandToken;
-    bool extraTextError = false;
-    std::string extraText;
+    string op;
 };
 
 // Represents one emitted 32-bit machine word in memory
 struct AssembledWord
 {
-    uint32_t address;
+    unsigned address;
     uint32_t machineCode;//stores the 32 bit bit pattern
-    std::string mnemonic;
-    std::string operandStr;
+    string mnemonic;
+    string operandStr;
     //because an operand can be a stirng or a number - br loop
-    std::vector<std::string> labelsAtAddress;//labels defined at this line 
+    vector<string> labelsAtAddress;//labels defined at this line 
     bool isBranch;
-    std::string targetLabel;//label used at this line /branchs destination, used as an operand 
+    string targetLabel;//label used at this line /branchs destination, used as an operand 
     //like entry: alias: ldc 42
 //ldc entry
 //ldc alias
 //HALT - here ldc is target label for line 1 
-    int32_t rawOffset;
+    int rawOffset;
     //branch offset
     // Error marker for lines that failed to assemble. When isError is true the
     // address slot is still reserved (pc advances past it) but the listing prints
@@ -138,7 +138,7 @@ struct AssembledWord
     // be indistinguishable from a real instruction such as `ldc 0`, so no fake
     // word is ever emitted. Object-file writers must skip such rows.
     bool isError = false;
-    std::string errorText;
+    string errorText;
     //for unknown mnemonic insconsistency
 };
 
@@ -154,49 +154,47 @@ enum class Pass
 // ============================================================================
 
 // Trims leading and trailing whitespace from a string
-static std::string trim(const std::string &str)
+string trim(const string &str)
 {
     const char *whitespace = " \t\r\n";
     size_t start = str.find_first_not_of(whitespace);
-    if (start == std::string::npos)
+    if (start == string::npos)
         return "";
     size_t end = str.find_last_not_of(whitespace);
     return str.substr(start, end - start + 1);
 }
 
 // Strips comments starting with ';' from the source line
-static std::string stripComment(const std::string &line)
+string stripComment(const string &line)
 {
     size_t pos = line.find(';');
-    if (pos != std::string::npos)
-    {
+    if (pos != string::npos)
         return line.substr(0, pos);
-    }
     return line;
 }
 
 // Validates label name: starts with an alphabetic letter, followed by alphanumeric characters
-static bool isValidLabelName(const std::string &name)
+bool isValidLabelName(const string &name)
 {//we have used unsigned because some chars might have a negative code
     if (name.empty())
         return false;
-    if (!std::isalpha(static_cast<unsigned char>(name[0])))
+    if (!isalpha((unsigned char)name[0]))
         return false;
     for (size_t i = 1; i < name.size(); ++i)
     {
-        if (!std::isalnum(static_cast<unsigned char>(name[i])))
+        if (!isalnum(static_cast<unsigned char>(name[i])))
             return false;
     }
     return true;
 }
 
 // Searches the instruction table with exact, case-sensitive comparison
-static const InstructionInfo *findInstruction(const std::string &mnemonic)
+const InstructionInfo *findInstruction(const string &mnem)
 {
     // Deliberately exact comparison: mnemonics are case sensitive.
     for (size_t i = 0; i < INSTRUCTION_TABLE_SIZE; i++)
     {
-        if (mnemonic == INSTRUCTION_TABLE[i].mnemonic)
+        if (mnem == INSTRUCTION_TABLE[i].mnemonic)
         {
             return &INSTRUCTION_TABLE[i];
         }
@@ -206,32 +204,32 @@ static const InstructionInfo *findInstruction(const std::string &mnemonic)
 
 
 //converts string to number 
-static bool parseNumber(const std::string &token, int64_t &outVal)
+bool parseNumber(const string &tok, int64_t &outVal)
 {
-    if (token.empty())
+    if (tok.empty())
         return false;
     char *endPtr = nullptr;
     errno = 0;
     //endptr- function sets this to the first number after the valid parse number 
-    long val = std::strtol(token.c_str(), &endPtr, 0);
+    long val = strtol(tok.c_str(), &endPtr, 0);
     //didtn use c++ alternatives coz it was mentioened in the pdf so that we can get to know 
     //the type(octal,hex etc ) , the first invalid char and 
     //0 means it automatically detects the base 
     if (errno != 0)
         return false;
         //first condition satisfied when the first char is not a number for eg 
-    if (endPtr == token.c_str() || *endPtr != '\0')
+    if (endPtr == tok.c_str() || *endPtr != '\0')
         return false;
-    outVal = val;
+    outVal = (int64_t)val;
     return true;
 }
 
 // convert xyz.asm to xyz 
-static std::string getBaseFilename(const std::string &filepath)
+string getBaseFilename(const string &filepath)
 {
     size_t dotPos = filepath.find_last_of('.');
     size_t slashPos = filepath.find_last_of("/\\");
-    if (dotPos != std::string::npos && (slashPos == std::string::npos || dotPos > slashPos))
+    if (dotPos != string::npos && (slashPos == string::npos || dotPos > slashPos))
     {
         return filepath.substr(0, dotPos);
     }
@@ -239,13 +237,13 @@ static std::string getBaseFilename(const std::string &filepath)
 }
 
 // Checks if token appears to be intended as a numeric literal (starts with digit or sign)
-static bool isNumericPrefix(const std::string &token)
+bool isNumericPrefix(const string &tok)
 {
-    if (token.empty())
+    if (tok.empty())
         return false;
-    if (std::isdigit(static_cast<unsigned char>(token[0])))
+    if (isdigit((unsigned char)tok[0]))
         return true;
-    if (token[0] == '+' || token[0] == '-')
+    if (tok[0] == '+' || tok[0] == '-')
     {
         return true;
     }
@@ -256,14 +254,14 @@ static bool isNumericPrefix(const std::string &token)
 // Source Line Parsing
 // ============================================================================
 
-// Parses a single raw source line into labels, mnemonic, operand, and extra text
-static ParsedLine parseLine(const std::string &rawLine, int lineNumber, std::vector<Diagnostic> &diagnostics)
+// Parses a single raw source line into labels, mnemonic, operand
+ParsedLine parseLine(const string &rawLine, int ln, vector<Diagnostic> &diags)
 {
     ParsedLine pl;
-    pl.lineNumber = lineNumber;
+    pl.lineNumber = ln;
     pl.rawLine = rawLine;
 
-    std::string cleaned = stripComment(rawLine);//removes the text after ;
+    string cleaned = stripComment(rawLine);//removes the text after ;
     cleaned = trim(cleaned);//trims the leading and trailing whitespaces 
     if (cleaned.empty())
     {
@@ -274,15 +272,15 @@ static ParsedLine parseLine(const std::string &rawLine, int lineNumber, std::vec
     while (true)
     {
         size_t colonPos = cleaned.find(':');
-        if (colonPos == std::string::npos)
+        if (colonPos == string::npos)
         {
             break;
         }
 
-        std::string labelPart = trim(cleaned.substr(0, colonPos));
+        string labelPart = trim(cleaned.substr(0, colonPos));
         if (labelPart.empty() || !isValidLabelName(labelPart))
         {
-            diagnostics.push_back({lineNumber, false, "bogus label name '" + labelPart + "'"});
+            diags.push_back({ln, false, "bogus label name '" + labelPart + "'"});
         }
         else
         {
@@ -305,48 +303,40 @@ static ParsedLine parseLine(const std::string &rawLine, int lineNumber, std::vec
     // so for unused label cleaned will now be empty
 
     // Extract mnemonic (cleaned is already trimmed, so no leading whitespace to skip)
-    size_t idx = 0;
+    size_t i = 0;
 //size_t covers till 2^64 -1 and unsinged till 2^32-1
 
-//The main reason is that idx is a string position: cleaned.size() returns std::string::size_type
-    size_t mnemStart = idx;
-    while (idx < cleaned.size() && cleaned[idx] != ' ' && cleaned[idx] != '\t' && cleaned[idx] != ',')
+//The main reason is that i is a string position: cleaned.size() returns string::size_type
+    size_t mStart = i;
+    while (i < cleaned.size() && cleaned[i] != ' ' && cleaned[i] != '\t' && cleaned[i] != ',')
     {
-        idx++;
+        i++;
     }
     //string.substr(pos, count);
     //count is optional take it to the end if not present 
-    pl.mnemonic = cleaned.substr(mnemStart, idx - mnemStart);
+    pl.mnem = cleaned.substr(mStart, i - mStart);
     pl.hasStatement = true;
 
     // Skip whitespace between mnemonic and operand
-    while (idx < cleaned.size() && (cleaned[idx] == ' ' || cleaned[idx] == '\t'))
+    while (i < cleaned.size() && (cleaned[i] == ' ' || cleaned[i] == '\t'))
     {
-        idx++;
+        i++;
     }
 
-    if (idx >= cleaned.size())
+    if (i >= cleaned.size())
     {
         return pl; // No operand
     }
 
     // Extract operand token: characters up to next whitespace or comma
-    size_t opStart = idx;
-    while (idx < cleaned.size() && cleaned[idx] != ' ' && cleaned[idx] != '\t' && cleaned[idx] != ',')
+    size_t opSt = i;
+    while (i < cleaned.size() && cleaned[i] != ' ' && cleaned[i] != '\t' && cleaned[i] != ',')
     {
-        idx++;
+        i++;
     }
 
     pl.hasOperand = true;
-    pl.operandToken = cleaned.substr(opStart, idx - opStart);
-
-    // Any remaining text is extra text
-    std::string extra = trim(cleaned.substr(idx));
-    if (!extra.empty())
-    {
-        pl.extraTextError = true;
-        pl.extraText = extra;
-    }
+    pl.op = cleaned.substr(opSt, i - opSt);
 
     return pl;
 }
@@ -357,14 +347,14 @@ static ParsedLine parseLine(const std::string &rawLine, int lineNumber, std::vec
 
 // Assembles all lines in either Pass 1 or Pass 2.
 // Single routine parameterized by 'pass' to ensure complete architectural consistency.
-static bool assemblePass(
-    const std::vector<ParsedLine> &lines,
+bool assemblePass(
+    const vector<ParsedLine> &lines,
     Pass pass,
-    std::map<std::string, SymbolEntry> &symbolTable,
-    std::vector<AssembledWord> &assembledWords,
-    std::vector<Diagnostic> &diagnostics)
+    map<string, SymbolEntry> &symbolTable,
+    vector<AssembledWord> &words,
+    vector<Diagnostic> &diagnostics)
 {
-    uint32_t pc = 0;
+    unsigned pc = 0;
     bool hasErrors = false;
 
     for (const ParsedLine &pl : lines)
@@ -373,12 +363,12 @@ static bool assemblePass(
         // First error on this source line found during the current pass, if any.
         // Pass 1 reports it to diagnostics; Pass 2 records it here so the listing
         // can print an ERROR row for the line instead of a misleading zero word.
-        std::string lineError;
+        string lineError;
 
         // Pass 1: Define labels
         if (pass == Pass::PASS_1)
         {
-            for (const std::string &lbl : pl.labels)
+            for (const string &lbl : pl.labels)
             //pl.labels only contains the labels that are defined on that line 
             //not the ones that are used in the line 
             {
@@ -390,7 +380,7 @@ static bool assemblePass(
                 else
                 {
                     SymbolEntry entry;
-                    entry.value = static_cast<int32_t>(pc);//value is int_32 because every label holds address but SET holds 32 bit constant 
+                    entry.value = (int)pc;//value is int because every label holds address but SET holds 32 bit constant 
                     entry.definedLine = lineNum;
                     entry.isUsed = false;
                     entry.isSet = false;
@@ -405,13 +395,13 @@ static bool assemblePass(
         }
 
         // Validate mnemonic
-        const InstructionInfo *inst = findInstruction(pl.mnemonic);
+        const InstructionInfo *inst = findInstruction(pl.mnem);
         if (!inst)
         {
             hasErrors = true;
             if (pass == Pass::PASS_1)
             {
-                diagnostics.push_back({lineNum, false, "unknown mnemonic '" + pl.mnemonic + "'"});
+                diagnostics.push_back({lineNum, false, "unknown mnemonic '" + pl.mnem + "'"});
                 // Reserve the address slot so Pass 1 addresses match the Pass 2
                 // listing exactly, even for lines that fail to assemble.
                 pc++;
@@ -423,15 +413,15 @@ static bool assemblePass(
             AssembledWord aw;
             aw.address = pc;
             aw.machineCode = 0; // unused when iserror is true; never written out
-            aw.mnemonic = pl.mnemonic;//is *inst rh
-            aw.operandStr = pl.hasOperand ? pl.operandToken : "";
+            aw.mnemonic = pl.mnem;//is *inst rh
+            aw.operandStr = pl.hasOperand ? pl.op : "";
             aw.labelsAtAddress = pl.labels;
             aw.isBranch = false;
             aw.targetLabel = "";
             aw.rawOffset = 0;
             aw.isError = true;
-            aw.errorText = "unknown mnemonic '" + pl.mnemonic + "'";
-            assembledWords.push_back(aw);
+            aw.errorText = "unknown mnemonic '" + pl.mnem + "'";
+            words.push_back(aw);
             pc++;
             continue;
         }
@@ -444,11 +434,11 @@ static bool assemblePass(
             {
                 if (pass == Pass::PASS_1)
                 {
-                    diagnostics.push_back({lineNum, false, "unexpected operand for '" + pl.mnemonic + "'"});
+                    diagnostics.push_back({lineNum, false, "unexpected operand for '" + pl.mnem + "'"});
                 }
                 else if (lineError.empty())
                 {
-                    lineError = "unexpected operand for '" + pl.mnemonic + "'";
+                    lineError = "unexpected operand for '" + pl.mnem + "'";
                 }
                 hasErrors = true;
             }
@@ -459,62 +449,48 @@ static bool assemblePass(
             {
                 if (pass == Pass::PASS_1)
                 {
-                    diagnostics.push_back({lineNum, false, "missing operand for '" + pl.mnemonic + "'"});
+                    diagnostics.push_back({lineNum, false, "missing operand for '" + pl.mnem + "'"});
                 }
                 else if (lineError.empty())
                 {
-                    lineError = "missing operand for '" + pl.mnemonic + "'";
+                    lineError = "missing operand for '" + pl.mnem + "'";
                 }
                 hasErrors = true;
             }
-        }
-
-        // Validate extra text at end of line
-        if (pl.extraTextError)
-        {
-            if (pass == Pass::PASS_1)
-            {
-                diagnostics.push_back({lineNum, false, "extra text at end of line: '" + pl.extraText + "'"});
-            }
-            else if (lineError.empty())
-            {
-                lineError = "extra text at end of line: '" + pl.extraText + "'";
-            }
-            hasErrors = true;
         }
 
         // Validate operand syntax: Pass 1 reports the diagnostic, Pass 2 records
         // the same text so the listing row can mirror it (no duplicate report).
         if (pl.hasOperand && inst->opType != OperandType::NONE)
         {
-            if (isNumericPrefix(pl.operandToken))
+            if (isNumericPrefix(pl.op))
             {
                 int64_t dummy = 0;
-                if (!parseNumber(pl.operandToken, dummy))
+                if (!parseNumber(pl.op, dummy))
                 {
                     hasErrors = true;
                     if (pass == Pass::PASS_1)
                     {
-                        diagnostics.push_back({lineNum, false, "invalid number '" + pl.operandToken + "'"});
+                        diagnostics.push_back({lineNum, false, "invalid number '" + pl.op + "'"});
                     }
                     else if (lineError.empty())
                     {
-                        lineError = "invalid number '" + pl.operandToken + "'";
+                        lineError = "invalid number '" + pl.op + "'";
                     }
                 }
             }
             else
             {
-                if (!isValidLabelName(pl.operandToken))
+                if (!isValidLabelName(pl.op))
                 {
                     hasErrors = true;
                     if (pass == Pass::PASS_1)
                     {
-                        diagnostics.push_back({lineNum, false, "bogus label name '" + pl.operandToken + "'"});
+                        diagnostics.push_back({lineNum, false, "bogus label name '" + pl.op + "'"});
                     }
                     else if (lineError.empty())
                     {
-                        lineError = "bogus label name '" + pl.operandToken + "'";
+                        lineError = "bogus label name '" + pl.op + "'";
                     }
                 }
             }
@@ -534,13 +510,13 @@ static bool assemblePass(
             if (pl.hasOperand)
             {
                 int64_t numVal = 0;
-                if (parseNumber(pl.operandToken, numVal))
+                if (parseNumber(pl.op, numVal))
                 {
                     if (pass == Pass::PASS_1)
                     {
-                        for (const std::string &lbl : pl.labels)
+                        for (const string &lbl : pl.labels)
                         {
-                            symbolTable[lbl].value = static_cast<int32_t>(numVal);
+                            symbolTable[lbl].value = (int)numVal;
                             symbolTable[lbl].isSet = true;
                         }
                     }
@@ -550,16 +526,16 @@ static bool assemblePass(
                     // Operand is a label
                     if (pass == Pass::PASS_2)
                     {
-                        auto it = symbolTable.find(pl.operandToken);
+                        auto it = symbolTable.find(pl.op);
                         if (it == symbolTable.end())
                         {
-                            diagnostics.push_back({lineNum, false, "no such label '" + pl.operandToken + "'"});
+                            diagnostics.push_back({lineNum, false, "no such label '" + pl.op + "'"});
                             hasErrors = true;
                         }
                         else
                         {
                             it->second.isUsed = true;
-                            for (const std::string &lbl : pl.labels)
+                            for (const string &lbl : pl.labels)
                             {
                                 symbolTable[lbl].value = it->second.value;
                                 symbolTable[lbl].isSet = true;
@@ -588,54 +564,54 @@ static bool assemblePass(
         size_t diagBefore = diagnostics.size();
         uint32_t word = 0;
         bool isBranch = (inst->opType == OperandType::OFFSET);
-        std::string targetLabel;
-        int32_t rawOffset = 0;
+        string tgt;
+        int rawOffset = 0;
 
         if (inst->opType == OperandType::NONE)
         {
-            word = static_cast<uint32_t>(inst->opcode & OPCODE_MASK);
+            word = (unsigned)(inst->opcode & 0xFF);
         }
         else if (inst->opType == OperandType::DATA)
         {
             int64_t numVal = 0;
-            if (parseNumber(pl.operandToken, numVal))
+            if (parseNumber(pl.op, numVal))
             {
-                word = static_cast<uint32_t>(numVal);
+                word = (unsigned)numVal;
             }
-            else if (isValidLabelName(pl.operandToken))
+            else if (isValidLabelName(pl.op))
             {
-                auto it = symbolTable.find(pl.operandToken);
+                auto it = symbolTable.find(pl.op);
                 if (it == symbolTable.end())
                 {
-                    diagnostics.push_back({lineNum, false, "no such label '" + pl.operandToken + "'"});
+                    diagnostics.push_back({lineNum, false, "no such label '" + pl.op + "'"});
                     hasErrors = true;
                 }
                 else
                 {
                     it->second.isUsed = true;
-                    word = static_cast<uint32_t>(it->second.value);
+                    word = (unsigned)it->second.value;
                 }
             }
         }
         else if (inst->opType == OperandType::VALUE)
         {
             int64_t numVal = 0;
-            int32_t val = 0;
-            if (parseNumber(pl.operandToken, numVal))
+            int val = 0;
+            if (parseNumber(pl.op, numVal))
             {
                 if (numVal < INT24_MIN_VAL || numVal > INT24_MAX_VAL)
                 {
-                    diagnostics.push_back({lineNum, false, "operand out of range (" + pl.operandToken + ")"});
+                    diagnostics.push_back({lineNum, false, "operand out of range (" + pl.op + ")"});
                     hasErrors = true;
                 }
-                val = static_cast<int32_t>(numVal);
+                val = static_cast<int>(numVal);
             }
-            else if (isValidLabelName(pl.operandToken))
+            else if (isValidLabelName(pl.op))
             {
-                auto it = symbolTable.find(pl.operandToken);
+                auto it = symbolTable.find(pl.op);
                 if (it == symbolTable.end())
                 {
-                    diagnostics.push_back({lineNum, false, "no such label '" + pl.operandToken + "'"});
+                    diagnostics.push_back({lineNum, false, "no such label '" + pl.op + "'"});
                     hasErrors = true;
                 }
                 else
@@ -644,53 +620,53 @@ static bool assemblePass(
                     val = it->second.value;
                     if (val < INT24_MIN_VAL || val > INT24_MAX_VAL)
                     {
-                        diagnostics.push_back({lineNum, false, "operand out of range (" + pl.operandToken + ")"});
+                        diagnostics.push_back({lineNum, false, "operand out of range (" + pl.op + ")"});
                         hasErrors = true;
                     }
                 }
             }
-            word = ((static_cast<uint32_t>(val) & OPERAND24_MASK) << OPERAND_SHIFT) |
-                   (static_cast<uint32_t>(inst->opcode) & OPCODE_MASK);
+            word = (((unsigned)val & 0xFFFFFF) << 8) |
+                   ((unsigned)inst->opcode & 0xFF);
         }
         else if (inst->opType == OperandType::OFFSET)
         {
             int64_t numVal = 0;
-            int32_t offset = 0;
-            if (parseNumber(pl.operandToken, numVal))
+            int offset = 0;
+            if (parseNumber(pl.op, numVal))
             {
                 // Numeric operand for branch is used as raw offset directly
                 if (numVal < INT24_MIN_VAL || numVal > INT24_MAX_VAL)
                 {
-                    diagnostics.push_back({lineNum, false, "operand out of range (" + pl.operandToken + ")"});
+                    diagnostics.push_back({lineNum, false, "operand out of range (" + pl.op + ")"});
                     hasErrors = true;
                 }
-                offset = static_cast<int32_t>(numVal);
+                offset = (int)numVal;
                 rawOffset = offset;
             }
-            else if (isValidLabelName(pl.operandToken))
+            else if (isValidLabelName(pl.op))
             {
-                auto it = symbolTable.find(pl.operandToken);
+                auto it = symbolTable.find(pl.op);
                 if (it == symbolTable.end())
                 {
-                    diagnostics.push_back({lineNum, false, "no such label '" + pl.operandToken + "'"});
+                    diagnostics.push_back({lineNum, false, "no such label '" + pl.op + "'"});
                     hasErrors = true;
                 }
                 else
                 {
                     it->second.isUsed = true;
-                    targetLabel = pl.operandToken;
-                    int32_t targetAddr = it->second.value;
-                    offset = targetAddr - static_cast<int32_t>(pc + 1);
+                    tgt = pl.op;
+                    int targetAddr = it->second.value;
+                    offset = targetAddr - (int)(pc + 1);
                     rawOffset = offset;
                     if (offset < INT24_MIN_VAL || offset > INT24_MAX_VAL)
                     {
-                        diagnostics.push_back({lineNum, false, "operand out of range (" + pl.operandToken + ")"});
+                        diagnostics.push_back({lineNum, false, "operand out of range (" + pl.op + ")"});
                         hasErrors = true;
                     }
                 }
             }
-            word = ((static_cast<uint32_t>(offset) & OPERAND24_MASK) << OPERAND_SHIFT) |
-                   (static_cast<uint32_t>(inst->opcode) & OPCODE_MASK);
+            word = (((unsigned)offset & 0xFFFFFF) << 8) |
+                   (static_cast<unsigned>(inst->opcode) & 0xFF);
         }
 
         // A fresh Pass-2 diagnostic for this line (e.g. no such label, operand
@@ -708,8 +684,8 @@ static bool assemblePass(
         if (!lineError.empty())
         {
             aw.machineCode = 0; // unused when isError is true; never written out
-            aw.mnemonic = pl.mnemonic;
-            aw.operandStr = pl.hasOperand ? pl.operandToken : "";
+            aw.mnemonic = pl.mnem;
+            aw.operandStr = pl.hasOperand ? pl.op : "";
             aw.labelsAtAddress = pl.labels;
             aw.isBranch = false;
             aw.targetLabel = "";
@@ -720,16 +696,16 @@ static bool assemblePass(
         else
         {
             aw.machineCode = word;
-            aw.mnemonic = pl.mnemonic;
-            aw.operandStr = pl.operandToken;
+            aw.mnemonic = pl.mnem;
+            aw.operandStr = pl.op;
             aw.labelsAtAddress = pl.labels;
             aw.isBranch = isBranch;
-            aw.targetLabel = targetLabel;
+            aw.targetLabel = tgt;
             aw.rawOffset = rawOffset;
             aw.isError = false;
             aw.errorText = "";
         }
-        assembledWords.push_back(aw);
+        words.push_back(aw);
 
         pc++;
     }
@@ -754,12 +730,12 @@ static bool assemblePass(
 // ============================================================================
 
 // Writes raw binary object file (32-bit little-endian words, address 0 first, no header)
-static bool writeObjectFile(const std::string &filename, const std::vector<AssembledWord> &words)
+bool writeObjectFile(const string &filename, const vector<AssembledWord> &words)
 {
-    std::ofstream out(filename, std::ios::binary);
+    ofstream out(filename, ios::binary);
     if (!out.is_open())
     {
-        std::cerr << "Error: Could not open output object file " << filename << std::endl;
+        fprintf(stderr, "Error: Could not open output object file %s\n", filename.c_str());
         return false;
     }
 
@@ -774,9 +750,9 @@ static bool writeObjectFile(const std::string &filename, const std::vector<Assem
         }
         uint32_t code = aw.machineCode;
         uint8_t bytes[4];
-        bytes[0] = static_cast<uint8_t>(code & 0xFF);
+        bytes[0] = (uint8_t)(code & 0xFF);
         bytes[1] = static_cast<uint8_t>((code >> 8) & 0xFF);
-        bytes[2] = static_cast<uint8_t>((code >> 16) & 0xFF);
+        bytes[2] = (uint8_t)((code >> 16) & 0xFF);
         bytes[3] = static_cast<uint8_t>((code >> 24) & 0xFF);
         out.write(reinterpret_cast<const char *>(bytes), 4);
     }
@@ -785,21 +761,21 @@ static bool writeObjectFile(const std::string &filename, const std::vector<Assem
 }
 
 // Writes listing file in the preferred advanced format
-static bool writeListingFile(
-    const std::string &filename,
-    const std::vector<AssembledWord> &words,
-    const std::map<std::string, SymbolEntry> &symbolTable)
+bool writeListingFile(
+    const string &filename,
+    const vector<AssembledWord> &words,
+    const map<string, SymbolEntry> &syms)
 {
-    std::ofstream out(filename);
+    ofstream out(filename);
     if (!out.is_open())
     {
-        std::cerr << "Error: Could not open output listing file " << filename << std::endl;
+        cerr << "Error: Could not open output listing file " << filename << endl;
         return false;
     }
 
     // Build reverse map of address -> labels for branch label resolution
-    std::map<int32_t, std::string> addrToLabel;
-    for (const auto &pair : symbolTable)
+    map<int, string> addrToLabel;
+    for (const auto &pair : syms)
     {
         if (!pair.second.isSet)
         {
@@ -814,10 +790,10 @@ static bool writeListingFile(
     for (const AssembledWord &aw : words)
     {
         // Print label line if any labels defined at this address
-        for (const std::string &lbl : aw.labelsAtAddress)
+        for (const string &lbl : aw.labelsAtAddress)
         {
-            out << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << aw.address
-                << " " << lbl << ":\n";
+            out << uppercase << hex << setfill('0') << setw(8) << aw.address
+                << " " << lbl << ":" << endl;
         }
 
         // Failed lines keep their address slot but print the diagnostic instead
@@ -826,21 +802,21 @@ static bool writeListingFile(
         // Format: AAAAAAAA ERROR <message>
         if (aw.isError)
         {
-            out << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << aw.address
+            out << uppercase << hex << setfill('0') << setw(8) << aw.address
                 << " ERROR " << aw.errorText << "\n";
             continue;
         }
 
         // Instruction word line: AAAAAAAA XXXXXXXX mnemonic operand
-        out << std::uppercase << std::hex << std::setfill('0') << std::setw(8) << aw.address
-            << " " << std::setw(8) << aw.machineCode
+        out << uppercase << hex << setfill('0') << setw(8) << aw.address
+            << " " << setw(8) << aw.machineCode
             << " " << aw.mnemonic;
 
         if (!aw.operandStr.empty())
         {
             if (aw.isBranch)
             {
-                int32_t targetAddr = static_cast<int32_t>(aw.address + 1) + aw.rawOffset;
+                int targetAddr = (int)(aw.address + 1) + aw.rawOffset;
                 auto it = addrToLabel.find(targetAddr);
                 if (it != addrToLabel.end())
                 {
@@ -860,7 +836,7 @@ static bool writeListingFile(
                 out << " " << aw.operandStr;
             }
         }
-        out << "\n";
+        out << endl;
     }
 
     return true;
@@ -873,27 +849,27 @@ int main(int argc, char *argv[])
     //appears on the string right away even if the program crashes 
     if (argc < 2)
     {//used argv[0] instead of hardcoding asm so that it can be accessed from someother file path too 
-        std::cerr << "Usage: " << argv[0] << " <source.asm>" << std::endl;
+        cerr << "Usage: " << argv[0] << " <source.asm>" << endl;
         return 1;
     }
 
-    std::string inputPath = argv[1];
+    string inputPath = argv[1];
     //ifstream- a type that represnets file opened for reading 
-    std::ifstream inFile(inputPath);
+    ifstream inFile(inputPath);
     if (!inFile.is_open())
     {
-        std::cerr << "Error: Could not open input file " << inputPath << std::endl;
+        fprintf(stderr, "Error: Could not open input file %s\n", inputPath.c_str());
         return 1;
     }
 //we are creaitng a separate data structure for the error message and not just combining into the 
 //parsed line strcture because we might have multiple errors in a single error
 
-    std::vector<Diagnostic> diagnostics;
-    std::vector<ParsedLine> parsedLines;
-    std::string lineStr;
+    vector<Diagnostic> diagnostics;
+    vector<ParsedLine> parsedLines;
+    string lineStr;
     int lineCounter = 1;
 
-    while (std::getline(inFile, lineStr))
+    while (getline(inFile, lineStr))
     {
         ParsedLine pl = parseLine(lineStr, lineCounter, diagnostics);
         parsedLines.push_back(pl);
@@ -903,18 +879,18 @@ int main(int argc, char *argv[])
     inFile.close();
     //matters more when more than 1 programs are open doesnt really matter here
 
-    std::map<std::string, SymbolEntry> symbolTable;
-    std::vector<AssembledWord> dummyWords;
+    map<string, SymbolEntry> symbolTable;
+    vector<AssembledWord> dummyWords;
 
     // Pass 1: Build symbol table and check basic syntax
     assemblePass(parsedLines, Pass::PASS_1, symbolTable, dummyWords, diagnostics);
 
     // Pass 2: Code generation and label resolution
-    std::vector<AssembledWord> codeWords;
+    vector<AssembledWord> codeWords;
     assemblePass(parsedLines, Pass::PASS_2, symbolTable, codeWords, diagnostics);
 
     // Sort diagnostics by line number
-    std::sort(diagnostics.begin(), diagnostics.end(), [](const Diagnostic &a, const Diagnostic &b)
+    sort(diagnostics.begin(), diagnostics.end(), [](const Diagnostic &a, const Diagnostic &b)
               {
                   if (a.line != b.line)
                       return a.line < b.line;
@@ -927,18 +903,18 @@ int main(int argc, char *argv[])
     {
         if (diag.isWarning)
         {
-            std::cerr << "Warning: Line " << diag.line << ": " << diag.message << std::endl;
+            cerr << "Warning: Line " << diag.line << ": " << diag.message << endl;
         }
         else
         {
-            std::cerr << "Error: Line " << diag.line << ": " << diag.message << std::endl;
+            cerr << "Error: Line " << diag.line << ": " << diag.message << "\n";
             hasErrors = true;
         }
     }
 
-    std::string baseName = getBaseFilename(inputPath);
-    std::string objFilename = baseName + ".o";
-    std::string lstFilename = baseName + ".lst";
+    string baseName = getBaseFilename(inputPath);
+    string objFilename = baseName + ".o";
+    string lstFilename = baseName + ".lst";
 
     // Write listing file
     writeListingFile(lstFilename, codeWords, symbolTable);
@@ -946,7 +922,7 @@ int main(int argc, char *argv[])
     // Produce no object file if any error occurred
     if (hasErrors)
     {
-        std::cerr << "Assembly failed with errors. No object file generated." << std::endl;
+        cerr << "Assembly failed with errors. No object file generated." << endl;
         return 1;
     }
 

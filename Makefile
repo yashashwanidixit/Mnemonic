@@ -1,9 +1,9 @@
-# Makefile for IITPSx Assembler, Emulator, and Tests
+# Makefile for IITPSx Assembler and Emulator
 # Name: Yashashwani | ID: 2501AI49
 # "I declare this is my own work."
 
-CXX = g++
-CXXFLAGS = -std=c++17 -pedantic -Wall -Wextra -Wpointer-arith -Wwrite-strings -O2
+CXX=g++
+CXXFLAGS=-std=c++17 -pedantic -Wall -Wextra -Wpointer-arith -Wwrite-strings -O2
 
 all: asm emu
 

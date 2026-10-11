@@ -3,7 +3,6 @@ Error: Line 8: bogus label name '0badlabel'
 Error: Line 11: unknown mnemonic 'fakeopcode'
 Error: Line 14: missing operand for 'ldc'
 Error: Line 17: unexpected operand for 'add'
-Error: Line 20: extra text at end of line: ', 6'
 Error: Line 23: invalid number '08'
 Error: Line 26: invalid number '08ge'
 Error: Line 29: operand out of range (99999999)
