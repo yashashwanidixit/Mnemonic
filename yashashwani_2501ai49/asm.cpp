@@ -113,6 +113,8 @@ struct ParsedLine
     string mnem;
     bool hasOperand = false;
     string op;
+    bool extraTextError = false;
+    string extraText;
 };
 
 // Represents one emitted 32-bit machine word in memory
@@ -338,6 +340,14 @@ ParsedLine parseLine(const string &rawLine, int ln, vector<Diagnostic> &diags)
     pl.hasOperand = true;
     pl.op = cleaned.substr(opSt, i - opSt);
 
+    // Any remaining text after the operand is extra words
+    string extra = trim(cleaned.substr(i));
+    if (!extra.empty())
+    {
+        pl.extraTextError = true;
+        pl.extraText = extra;
+    }
+
     return pl;
 }
 
@@ -457,6 +467,20 @@ bool assemblePass(
                 }
                 hasErrors = true;
             }
+        }
+
+        // Validate extra words at end of line
+        if (pl.extraTextError)
+        {
+            if (pass == Pass::PASS_1)
+            {
+                diagnostics.push_back({lineNum, false, "extra text at end of line: '" + pl.extraText + "'"});
+            }
+            else if (lineError.empty())
+            {
+                lineError = "extra text at end of line: '" + pl.extraText + "'";
+            }
+            hasErrors = true;
         }
 
         // Validate operand syntax: Pass 1 reports the diagnostic, Pass 2 records

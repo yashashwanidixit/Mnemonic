@@ -2,7 +2,7 @@
 00000001 ERROR unknown mnemonic 'fakeopcode'
 00000002 ERROR missing operand for 'ldc'
 00000003 ERROR unexpected operand for 'add'
-00000004 00000500 ldc 5
+00000004 ERROR extra text at end of line: ', 6'
 00000005 ERROR invalid number '08'
 00000006 ERROR invalid number '08ge'
 00000007 ERROR operand out of range (99999999)

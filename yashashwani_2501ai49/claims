@@ -39,7 +39,7 @@ The following features have been fully implemented,and verified:
 5. Test programs assemble:==============
    - implemented and verified 
    - `test01.asm` (specification verification test) assembles cleanly and yields exact matching byte encoding.
-   - `test02.asm` finds every required error (bad label name, unknown instruction, missing operand, extra operand, bad numbers, number too big, unknown label, repeated label) and no object file is made.
+   - `test02.asm` finds every required error (bad label name, unknown instruction, missing operand, extra operand, extra words at end of line, bad numbers, number too big, unknown label, repeated label) and no object file is made.
    - `test03.asm` (SET test) assembles cleanly and resolves forward and backward label references.
    - `test04.asm` (mul and div verification) assembles cleanly.
    - `test05.asm` (bubble sort) assembles cleanly.
